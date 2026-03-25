@@ -16,6 +16,7 @@ export interface JobData {
 
 interface JobCardProps {
   job: JobData;
+  freelancerStatus?: string;
   onRefresh: () => void;
 }
 
@@ -23,22 +24,39 @@ function truncate(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-export default function JobCard({ job }: JobCardProps) {
+export default function JobCard({ job, freelancerStatus }: JobCardProps) {
   const fundedEth = ethers.formatEther(job.totalFunded);
 
   return (
-    <div className="group relative rounded-2xl border border-white/8 bg-white/3 p-5 backdrop-blur transition-all duration-300 hover:border-white/15 hover:bg-white/5 hover:shadow-2xl hover:shadow-black/30">
+    <div className="group relative w-full h-full flex flex-col rounded-2xl border border-white/8 bg-white/3 p-5 backdrop-blur transition-all duration-300 hover:border-white/15 hover:bg-white/5 hover:shadow-2xl hover:shadow-black/30">
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex items-center gap-2 max-w-[70%]">
           <span className="text-xs font-mono text-zinc-500">#{job.id}</span>
           <span className="text-sm font-semibold text-white truncate">{job.title || "Untitled Job"}</span>
         </div>
-        {job.totalFunded > 0n && (
-          <span className="text-sm font-semibold text-white whitespace-nowrap">
-            {fundedEth} ETH
-          </span>
-        )}
+        <div className="flex flex-col items-end gap-1">
+          {job.totalFunded > 0n && (
+            <span className="text-sm font-semibold text-white whitespace-nowrap">
+              {fundedEth} ETH
+            </span>
+          )}
+          {freelancerStatus === "pending" && (
+            <span className="text-[10px] bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
+              Pending Acceptance
+            </span>
+          )}
+          {freelancerStatus === "rejected" && (
+            <span className="text-[10px] bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
+              Offer Rejected
+            </span>
+          )}
+          {freelancerStatus === "accepted" && (
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
+              Accepted
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Description */}

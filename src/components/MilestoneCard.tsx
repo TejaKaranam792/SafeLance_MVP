@@ -25,6 +25,7 @@ interface MilestoneCardProps {
   milestone: MilestoneData;
   isClient: boolean;
   isFreelancer: boolean;
+  freelancerStatus?: string;
   onRefresh: () => void;
 }
 
@@ -37,7 +38,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   Refunded:  { label: "Refunded",  color: "text-red-400",    bg: "bg-red-500/10",    border: "border-red-500/20",    icon: <XCircle className="h-3 w-3" /> },
 };
 
-export default function MilestoneCard({ jobId, milestone, isClient, isFreelancer, onRefresh }: MilestoneCardProps) {
+export default function MilestoneCard({ jobId, milestone, isClient, isFreelancer, freelancerStatus, onRefresh }: MilestoneCardProps) {
   const { provider, account } = useWallet();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
@@ -191,8 +192,9 @@ export default function MilestoneCard({ jobId, milestone, isClient, isFreelancer
               {statusLabel === "Pending" && (
                 <button
                   onClick={fundMilestone}
-                  disabled={!!loading}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 text-xs font-semibold text-white transition-all"
+                  disabled={!!loading || freelancerStatus !== "accepted"}
+                  title={freelancerStatus !== "accepted" ? "Freelancer must accept first" : ""}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 text-xs font-semibold text-white transition-all disabled:cursor-not-allowed"
                 >
                   {loading === "fund" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   Fund {amountEth} ETH

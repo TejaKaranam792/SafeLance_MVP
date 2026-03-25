@@ -8,6 +8,7 @@ import { Shield, ArrowLeft, Loader2, ExternalLink, Copy, CheckCircle, AlertTrian
 import { MILESTONE_ABI, MILESTONE_CONTRACT_ADDRESS, MILESTONE_STATUS, type MilestoneStatusKey, RPC_URL } from "@/lib/contract";
 import { useWallet } from "@/components/WalletContext";
 import MilestoneCard, { type MilestoneData } from "@/components/MilestoneCard";
+import ChatBox from "@/components/ChatBox";
 
 interface JobOnChain {
   client: string;
@@ -34,6 +35,9 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const [freelancerStatus, setFreelancerStatus] = useState<string>("pending");
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const numJobId = Number(jobId);
 
@@ -79,10 +83,11 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
       const msData = await Promise.all(msPromises);
       setMilestones(msData);
 
-      // Fetch milestone metadata from Supabase
-      const res = await fetch(`/api/milestones?jobId=${numJobId}`);
-      if (res.ok) {
-        const meta: Array<{ milestone_index: number; description?: string; deliverable_url?: string }> = await res.json();
+      // Fetch milestone from Supabase
+      const msRes = await fetch(`/api/milestones?jobId=${numJobId}`);
+
+      if (msRes.ok) {
+        const meta: Array<{ milestone_index: number; description?: string; deliverable_url?: string }> = await msRes.json();
         const metaMap: Record<number, { description?: string; deliverableUrl?: string }> = {};
         meta.forEach((m) => {
           metaMap[m.milestone_index] = {
@@ -91,6 +96,18 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
           };
         });
         setMetaMilestones(metaMap);
+      }
+
+      // Fetch job metadata with cache busting
+      const metaRes2 = await fetch(`/api/jobs/meta?jobId=${numJobId}&_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      });
+      if (metaRes2.ok) {
+        const jobMeta = await metaRes2.json();
+        if (jobMeta && jobMeta.freelancer_status) {
+          setFreelancerStatus(jobMeta.freelancer_status);
+        }
       }
 
       setError(null);
@@ -166,6 +183,71 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
 
       {/* Job Header */}
       <div className="mb-8">
+        
+        {/* Status Banner */}
+        {freelancerStatus !== "accepted" && (
+          <div className={`mb-6 rounded-xl border px-5 py-4 ${
+            freelancerStatus === "rejected" 
+              ? "border-red-500/30 bg-red-500/10" 
+              : "border-orange-500/30 bg-orange-500/10"
+          }`}>
+            <h3 className={`text-sm font-bold mb-1 ${
+              freelancerStatus === "rejected" ? "text-red-400" : "text-orange-400"
+            }`}>
+              {freelancerStatus === "rejected" ? "Offer Rejected" : "Pending Acceptance"}
+            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <p className={`text-sm ${
+                freelancerStatus === "rejected" ? "text-red-300" : "text-orange-300"
+              }`}>
+                {freelancerStatus === "rejected"
+                  ? isClient ? "The freelancer rejected this job offer. You may cancel or ignore this job." : "You have rejected this job offer."
+                  : isClient ? "Waiting for the freelancer to accept this job offer before they can begin work." : "The client has offered you this job. Please accept or reject it."}
+              </p>
+              
+              {/* Freelancer Accept/Reject Actions Inline */}
+              {isFreelancer && freelancerStatus === "pending" && (
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={async () => {
+                      setUpdatingStatus(true);
+                      const res = await fetch("/api/jobs/status", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ chainJobId: numJobId, status: "rejected", freelancerAddress: account }) });
+                      if (res.ok) {
+                        await loadJobData();
+                      } else {
+                        const ed = await res.json();
+                        alert("Error: " + ed.error);
+                      }
+                      setUpdatingStatus(false);
+                    }}
+                    disabled={updatingStatus}
+                    className="rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 px-4 py-2 text-xs font-semibold text-red-400 transition-all disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setUpdatingStatus(true);
+                      const res = await fetch("/api/jobs/status", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ chainJobId: numJobId, status: "accepted", freelancerAddress: account }) });
+                      if (res.ok) {
+                        await loadJobData();
+                      } else {
+                        const ed = await res.json();
+                        alert("Error: " + ed.error);
+                      }
+                      setUpdatingStatus(false);
+                    }}
+                    disabled={updatingStatus}
+                    className="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50"
+                  >
+                    Accept Offer
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div>
             <span className="text-xs text-zinc-600 font-mono mb-1 block">Job #{numJobId}</span>
@@ -282,11 +364,15 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
               }}
               isClient={isClient}
               isFreelancer={isFreelancer}
+              freelancerStatus={freelancerStatus}
               onRefresh={loadJobData}
             />
           ))}
         </div>
       </div>
+
+      {/* Chat System */}
+      <ChatBox jobId={numJobId} clientAddress={job.client} freelancerAddress={job.freelancer} />
     </div>
   );
 }

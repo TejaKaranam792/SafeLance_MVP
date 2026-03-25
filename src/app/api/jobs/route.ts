@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/jobs?address=0x...
 // Returns all jobs where the address is the client OR freelancer
 export async function GET(req: NextRequest) {
@@ -15,14 +17,14 @@ export async function GET(req: NextRequest) {
   // Fetch jobs where user is client
   const { data: clientJobs, error: clientError } = await supabase
     .from("jobs_meta")
-    .select("chain_job_id, title, description, client_address, freelancer_address, created_at")
+    .select("chain_job_id, title, description, client_address, freelancer_address, created_at, freelancer_status")
     .ilike("client_address", normalizedAddress)
     .order("created_at", { ascending: false });
 
   // Fetch jobs where user is freelancer
   const { data: freelancerJobs, error: freelancerError } = await supabase
     .from("jobs_meta")
-    .select("chain_job_id, title, description, client_address, freelancer_address, created_at")
+    .select("chain_job_id, title, description, client_address, freelancer_address, created_at, freelancer_status")
     .ilike("freelancer_address", normalizedAddress)
     .order("created_at", { ascending: false });
 
