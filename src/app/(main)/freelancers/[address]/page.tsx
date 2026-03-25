@@ -109,7 +109,7 @@ export default function FreelancerProfilePage({ params }: { params: { address: s
 
             <div className="border-t border-white/10 pt-6 mt-2">
               <Link 
-                href={`/?hire=${profile.eth_address}`}
+                href={`/app?hire=${profile.eth_address}`}
                 className="inline-flex w-full md:w-auto items-center justify-center rounded-xl bg-violet-600 hover:bg-violet-500 px-8 py-3.5 text-sm font-semibold text-white transition-all shadow-lg shadow-violet-500/20"
               >
                 Hire {profile.full_name.split(' ')[0]} Now →
