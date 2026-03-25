@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 interface MilestoneRow {
+  freelancerAddress: string;
   title: string;
   description: string;
   amountEth: string;
@@ -29,12 +30,12 @@ function AppPageContent() {
   );
 
   // Job form fields
-  const [freelancerAddress, setFreelancerAddress] = useState(searchParams?.get("hire") || "");
   const [jobTitle, setJobTitle] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const initialFreelancer = searchParams?.get("hire") || "";
   const [milestones, setMilestones] = useState<MilestoneRow[]>([
-    { title: "", description: "", amountEth: "0.01" },
-    { title: "", description: "", amountEth: "0.01" },
+    { freelancerAddress: initialFreelancer, title: "", description: "", amountEth: "0.01" },
+    { freelancerAddress: initialFreelancer, title: "", description: "", amountEth: "0.01" },
   ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,14 +56,14 @@ function AppPageContent() {
     const hireAddress = searchParams?.get("hire");
     if (hireAddress) {
       setActiveTab("client");
-      setFreelancerAddress(hireAddress);
+      setMilestones(prev => prev.map(m => ({ ...m, freelancerAddress: hireAddress })));
     }
   }, [searchParams]);
 
   // ── Milestone helpers ──────────────────────────────────────────────────────
   function addMilestone() {
     if (milestones.length >= 10) return;
-    setMilestones((ms) => [...ms, { title: "", description: "", amountEth: "0.01" }]);
+    setMilestones((ms) => [...ms, { freelancerAddress: ms[ms.length - 1]?.freelancerAddress || "", title: "", description: "", amountEth: "0.01" }]);
   }
 
   function removeMilestone(idx: number) {
@@ -104,6 +105,7 @@ function AppPageContent() {
 
     try {
       const milestoneTitles = milestones.map((m) => m.title.trim());
+      const freelancerAddresses = milestones.map((m) => m.freelancerAddress.trim());
       const milestoneAmounts = milestones.map((m) =>
         ethers.parseEther(String(parseFloat(m.amountEth)))
       );
@@ -113,11 +115,11 @@ function AppPageContent() {
       const contract = new ethers.Contract(MILESTONE_CONTRACT_ADDRESS, MILESTONE_ABI, signer);
 
       const tx = await contract.createJobWithMilestones(
-        freelancerAddress,
         jobTitle.trim(),
         jobDescription.trim(),
         milestoneTitles,
-        milestoneAmounts
+        milestoneAmounts,
+        freelancerAddresses
       );
       const receipt = await tx.wait();
 
@@ -137,6 +139,7 @@ function AppPageContent() {
       if (jobId !== null) {
         setCreatedJobId(jobId);
 
+        const uniqueFreelancers = Array.from(new Set(freelancerAddresses)).join(",");
         // Save metadata to Supabase
         await fetch("/api/milestones", {
           method: "POST",
@@ -144,10 +147,11 @@ function AppPageContent() {
           body: JSON.stringify({
             chainJobId: jobId,
             clientAddress: account,
-            freelancerAddress,
+            freelancerAddress: uniqueFreelancers,
             jobTitle: jobTitle.trim(),
             jobDescription: jobDescription.trim(),
             milestones: milestones.map((m) => ({
+              freelancerAddress: m.freelancerAddress.trim(),
               title: m.title.trim(),
               description: m.description.trim(),
             })),
@@ -156,10 +160,9 @@ function AppPageContent() {
       }
 
       // Reset form
-      setFreelancerAddress("");
       setJobTitle("");
       setJobDescription("");
-      setMilestones([{ title: "", description: "", amountEth: "0.01" }]);
+      setMilestones([{ freelancerAddress: initialFreelancer, title: "", description: "", amountEth: "0.01" }]);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Transaction failed");
     } finally {
@@ -227,119 +230,153 @@ function AppPageContent() {
                     Connect Wallet
                   </button>
                 </div>
+              ) : createdJobId !== null ? (
+                <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 py-16 px-8 text-center relative overflow-hidden shadow-2xl">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-64 w-64 bg-emerald-500/20 blur-[100px] pointer-events-none" />
+                  <CheckCircle className="h-16 w-16 text-emerald-400 mx-auto mb-6 relative z-10 animate-bounce" />
+                  <h2 className="text-3xl font-bold text-white mb-3 relative z-10">Job Activated!</h2>
+                  <p className="text-zinc-400 mb-10 relative z-10 max-w-sm mx-auto leading-relaxed">
+                    Your {milestones.length}-milestone job has been secured on the Sepolia blockchain. Work can now begin.
+                  </p>
+                  <Link
+                    href={`/jobs/${createdJobId}`}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-8 py-3.5 text-sm font-semibold text-white shadow-[0_0_30px_rgba(16,185,129,0.3)] transition-all duration-300 hover:scale-105 hover:-translate-y-1 relative z-10 border border-emerald-500/50"
+                  >
+                    View Job & Escrow Details
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Job Title */}
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Job Title</label>
+                  <div className="group">
+                    <label className="block text-xs font-semibold text-zinc-400 mb-2 transition-colors group-focus-within:text-violet-400 uppercase tracking-widest">
+                      Job Title
+                    </label>
                     <input
                       type="text"
                       value={jobTitle}
                       onChange={(e) => setJobTitle(e.target.value)}
                       required
-                      placeholder="Build a DeFi Dashboard"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all"
+                      placeholder="e.g. Build a Web3 Platform"
+                      className="w-full rounded-2xl border border-white/5 bg-white/[0.02] px-5 py-4 text-sm text-white placeholder-zinc-600 outline-none focus:border-violet-500/50 focus:bg-white/5 focus:ring-4 focus:ring-violet-500/10 transition-all hover:bg-white/[0.04]"
                     />
-                  </div>
-
-                  {/* Freelancer address */}
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                      Freelancer Wallet Address
-                    </label>
-                    <input
-                      type="text"
-                      value={freelancerAddress}
-                      onChange={(e) => setFreelancerAddress(e.target.value)}
-                      required
-                      pattern="^0x[a-fA-F0-9]{40}$"
-                      placeholder="0x..."
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all font-mono"
-                    />
-                    <p className="text-[11px] text-zinc-600 mt-1.5">
-                      Don&apos;t know a freelancer?{" "}
-                      <Link href="/freelancers" className="text-violet-400 hover:text-violet-300">
-                        Browse the directory →
-                      </Link>
-                    </p>
                   </div>
 
                   {/* Description */}
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">Job Description</label>
+                  <div className="group">
+                    <label className="block text-xs font-semibold text-zinc-400 mb-2 transition-colors group-focus-within:text-violet-400 uppercase tracking-widest">
+                      Job Description
+                    </label>
                     <textarea
-                      rows={2}
+                      rows={3}
                       value={jobDescription}
                       onChange={(e) => setJobDescription(e.target.value)}
-                      placeholder="Overview of the work scope..."
+                      placeholder="High level overview of what needs to be built..."
                       maxLength={280}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all resize-none"
+                      className="w-full rounded-2xl border border-white/5 bg-white/[0.02] px-5 py-4 text-sm text-white placeholder-zinc-600 outline-none focus:border-violet-500/50 focus:bg-white/5 focus:ring-4 focus:ring-violet-500/10 transition-all resize-none hover:bg-white/[0.04]"
                     />
                   </div>
 
                   {/* ── Milestones ─────────────────────────────────────────── */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-xs font-medium text-zinc-400">
-                        Milestones ({milestones.length}/10)
-                      </label>
-                      <span className="text-xs font-semibold text-white">
-                        Total: {totalEth.toFixed(4)} ETH
-                      </span>
+                  <div className="pt-6 mt-8 border-t border-white/5">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h3 className="text-lg font-bold text-white tracking-tight">Project Milestones</h3>
+                        <p className="text-xs text-zinc-500 mt-1">Assign deliverables, freelancers, and isolated funds</p>
+                      </div>
+                      <div className="text-right">
+                         <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 block">Total Escrow</span>
+                         <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-400">
+                           {totalEth.toFixed(4)} ETH
+                         </span>
+                      </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       {milestones.map((ms, idx) => (
                         <div
                           key={idx}
-                          className="rounded-xl border border-white/8 bg-white/2 p-4 space-y-3"
+                          className="group relative rounded-2xl border border-white/5 bg-white/[0.015] p-5 backdrop-blur-sm transition-all duration-300 hover:bg-white/[0.03] hover:border-white/10 hover:shadow-[0_8px_30px_rgba(139,92,246,0.06)]"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-bold text-white/20 uppercase tracking-widest">
-                              Milestone {idx + 1}
+                          {/* Deep glow accent */}
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-violet-500/60 to-indigo-500/10 rounded-l-2xl opacity-30 group-hover:opacity-100 transition-opacity" />
+
+                          <div className="flex items-center justify-between mb-5">
+                            <span className="flex items-center gap-3">
+                              <span className="flex items-center justify-center h-6 w-6 rounded-full bg-violet-500/10 text-violet-400 text-xs font-black">
+                                {idx + 1}
+                              </span>
+                              <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">
+                                Deliverable Phase
+                              </span>
                             </span>
                             {milestones.length > 1 && (
                               <button
                                 type="button"
                                 onClick={() => removeMilestone(idx)}
-                                className="text-zinc-700 hover:text-red-400 transition-colors"
+                                className="text-zinc-600 hover:text-red-400 hover:bg-red-400/10 p-1.5 rounded-lg transition-all"
+                                title="Remove Milestone"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-4 w-4" />
                               </button>
                             )}
                           </div>
 
-                          <input
-                            type="text"
-                            value={ms.title}
-                            onChange={(e) => updateMilestone(idx, "title", e.target.value)}
-                            required
-                            placeholder="Milestone title (e.g. Design Mockup)"
-                            className="w-full rounded-lg border border-white/8 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/40 focus:ring-1 focus:ring-violet-500/20 transition-all"
-                          />
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <input
-                              type="text"
-                              value={ms.description}
-                              onChange={(e) => updateMilestone(idx, "description", e.target.value)}
-                              placeholder="Short description (optional)"
-                              className="rounded-lg border border-white/8 bg-white/5 px-3 py-2.5 text-xs text-white placeholder-zinc-700 outline-none focus:border-violet-500/40 focus:ring-1 focus:ring-violet-500/20 transition-all"
-                            />
-                            <div className="relative">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-[10px] font-semibold text-zinc-500 mb-1.5 uppercase tracking-widest">Milestone Title</label>
                               <input
-                                type="number"
-                                value={ms.amountEth}
-                                onChange={(e) => updateMilestone(idx, "amountEth", e.target.value)}
+                                type="text"
+                                value={ms.title}
+                                onChange={(e) => updateMilestone(idx, "title", e.target.value)}
                                 required
-                                min="0.0001"
-                                step="0.001"
-                                placeholder="0.05"
-                                className="w-full rounded-lg border border-white/8 bg-white/5 pl-3 pr-12 py-2.5 text-xs text-white placeholder-zinc-700 outline-none focus:border-violet-500/40 focus:ring-1 focus:ring-violet-500/20 transition-all"
+                                placeholder="e.g. Wireframes & UI"
+                                className="w-full rounded-xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/20 transition-all hover:bg-white/10"
                               />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-zinc-600 pointer-events-none">
-                                ETH
-                              </span>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-semibold text-zinc-500 mb-1.5 uppercase tracking-widest">Assigned Freelancer</label>
+                              <input
+                                type="text"
+                                value={ms.freelancerAddress}
+                                onChange={(e) => updateMilestone(idx, "freelancerAddress", e.target.value)}
+                                required
+                                pattern="^0x[a-fA-F0-9]{40}$"
+                                placeholder="0x..."
+                                className="w-full font-mono rounded-xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/20 transition-all hover:bg-white/10"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2">
+                              <label className="block text-[10px] font-semibold text-zinc-500 mb-1.5 uppercase tracking-widest">Requirements</label>
+                              <input
+                                type="text"
+                                value={ms.description}
+                                onChange={(e) => updateMilestone(idx, "description", e.target.value)}
+                                placeholder="Optional specific requirements..."
+                                className="w-full rounded-xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/20 transition-all hover:bg-white/10"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-semibold text-zinc-500 mb-1.5 uppercase tracking-widest">Payout</label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  value={ms.amountEth}
+                                  onChange={(e) => updateMilestone(idx, "amountEth", e.target.value)}
+                                  required
+                                  min="0.0001"
+                                  step="0.001"
+                                  placeholder="0.00"
+                                  className="w-full rounded-xl border border-white/5 bg-white/5 pl-4 pr-14 py-3 text-sm font-semibold text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/20 transition-all hover:bg-white/10"
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-violet-400 pointer-events-none">
+                                  ETH
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -350,10 +387,12 @@ function AppPageContent() {
                       <button
                         type="button"
                         onClick={addMilestone}
-                        className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-transparent hover:bg-white/3 py-2.5 text-xs font-medium text-zinc-500 hover:text-zinc-300 transition-all"
+                        className="group mt-4 w-full flex items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 bg-transparent hover:bg-violet-500/5 py-4 text-sm font-bold text-zinc-400 hover:text-violet-300 hover:border-violet-500/30 transition-all duration-300"
                       >
-                        <Plus className="h-3.5 w-3.5" />
-                        Add Milestone
+                        <span className="flex items-center justify-center bg-white/5 rounded-full p-1 group-hover:bg-violet-500/20 transition-colors">
+                          <Plus className="h-4 w-4" />
+                        </span>
+                        Add New Subject Phase
                       </button>
                     )}
                   </div>
@@ -362,40 +401,25 @@ function AppPageContent() {
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-3 text-sm font-semibold text-white transition-all duration-200 shadow-lg shadow-violet-500/20"
+                    className="relative w-full mt-10 overflow-hidden rounded-2xl group border border-white/10 p-[1px] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Creating Job…
-                      </>
-                    ) : (
-                      <>
-                        Create Job with {milestones.length} Milestone{milestones.length !== 1 ? "s" : ""}
-                        <ArrowRight className="h-4 w-4" />
-                      </>
-                    )}
+                    <span className="absolute inset-0 bg-gradient-to-r from-violet-600 to-indigo-600 opacity-80 group-hover:opacity-100 transition-opacity" />
+                    <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-[1.5s] ease-in-out" />
+                    <div className="relative flex items-center justify-center gap-2 rounded-2xl bg-zinc-950/20 backdrop-blur-sm px-4 py-4 text-sm font-bold text-white transition-all duration-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]">
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin text-zinc-300" />
+                          <span className="text-zinc-200">Deploying Escrow to Blockchain…</span>
+                        </>
+                      ) : (
+                        <>
+                          Deplopy &amp; Fund Jobs ({totalEth.toFixed(4)} ETH)
+                          <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1.5 transition-transform" />
+                        </>
+                      )}
+                    </div>
                   </button>
                 </form>
-              )}
-
-              {/* Success */}
-              {createdJobId !== null && (
-                <div className="mt-5 rounded-xl border border-emerald-500/25 bg-emerald-500/8 px-5 py-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-4 w-4 text-emerald-400" />
-                    <p className="text-sm font-semibold text-emerald-400">Job #{createdJobId} Created!</p>
-                  </div>
-                  <p className="text-xs text-emerald-400/70 mb-3">
-                    Milestones are live on-chain. Fund each milestone to begin work.
-                  </p>
-                  <Link
-                    href={`/jobs/${createdJobId}`}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
-                  >
-                    Go to Payment Page →
-                  </Link>
-                </div>
               )}
 
               {error && (

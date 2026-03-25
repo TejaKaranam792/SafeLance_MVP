@@ -11,6 +11,7 @@ import { useWallet } from "@/components/WalletContext";
 
 export interface MilestoneData {
   index: number;
+  freelancer: string;
   title: string;
   amount: bigint;       // wei
   status: MilestoneStatusKey;
@@ -24,7 +25,6 @@ interface MilestoneCardProps {
   jobId: number;
   milestone: MilestoneData;
   isClient: boolean;
-  isFreelancer: boolean;
   freelancerStatus?: string;
   onRefresh: () => void;
 }
@@ -38,8 +38,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   Refunded:  { label: "Refunded",  color: "text-red-400",    bg: "bg-red-500/10",    border: "border-red-500/20",    icon: <XCircle className="h-3 w-3" /> },
 };
 
-export default function MilestoneCard({ jobId, milestone, isClient, isFreelancer, freelancerStatus, onRefresh }: MilestoneCardProps) {
+export default function MilestoneCard({ jobId, milestone, isClient, freelancerStatus, onRefresh }: MilestoneCardProps) {
   const { provider, account } = useWallet();
+  const isFreelancer = account?.toLowerCase() === milestone.freelancer.toLowerCase();
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [deliverableInput, setDeliverableInput] = useState(milestone.deliverableUrl ?? "");
@@ -121,48 +122,56 @@ export default function MilestoneCard({ jobId, milestone, isClient, isFreelancer
   }
 
   return (
-    <div className={`rounded-2xl border ${config.border} bg-white/2 overflow-hidden transition-all duration-200`}>
+    <div className={`group relative rounded-2xl border ${config.border} bg-zinc-900/40 backdrop-blur-md overflow-hidden transition-all duration-300 hover:border-white/10 hover:bg-zinc-900/60 hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)]`}>
+      {/* Status Glow Edge */}
+      <div className={`absolute left-0 top-0 bottom-0 w-1 ${config.bg} opacity-50 group-hover:opacity-100 transition-opacity`} />
+      
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-5 text-left hover:bg-white/3 transition-colors"
+        className="w-full flex flex-col sm:flex-row sm:items-center justify-between p-5 text-left hover:bg-white/[0.02] transition-colors relative z-10 gap-4"
       >
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-sm font-black text-white/20 flex-shrink-0 w-6">
-            {String(milestone.index + 1).padStart(2, "0")}
+        <div className="flex items-start sm:items-center gap-4 min-w-0 pl-2">
+          <span className={`flex items-center justify-center h-8 w-8 rounded-full ${config.bg} ${config.color} text-xs font-black flex-shrink-0 border ${config.border}`}>
+            {String(milestone.index + 1)}
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate">{milestone.title}</p>
+            <p className="text-base font-bold text-white tracking-tight truncate">{milestone.title}</p>
             {milestone.description && (
-              <p className="text-xs text-zinc-500 mt-0.5 truncate">{milestone.description}</p>
+              <p className="text-xs text-zinc-500 mt-1 truncate max-w-md">{milestone.description}</p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-shrink-0 ml-4">
-          <span className={`inline-flex items-center gap-1.5 text-[11px] font-medium border rounded-full px-2.5 py-1 ${config.bg} ${config.border} ${config.color}`}>
+        <div className="flex items-center gap-4 flex-shrink-0 sm:ml-4 pl-14 sm:pl-0 w-full sm:w-auto">
+          <span className={`inline-flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-widest font-bold border rounded-lg px-3 py-1.5 ${config.bg} ${config.border} ${config.color}`}>
             {config.icon}
             {config.label}
           </span>
-          <span className="text-sm font-semibold text-white">{amountEth} ETH</span>
-          {expanded ? <ChevronUp className="h-4 w-4 text-zinc-600" /> : <ChevronDown className="h-4 w-4 text-zinc-600" />}
+          <span className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-white ml-auto sm:ml-0">{amountEth} ETH</span>
+          <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center ml-2">
+            {expanded ? <ChevronUp className="h-4 w-4 text-zinc-400" /> : <ChevronDown className="h-4 w-4 text-zinc-400" />}
+          </div>
         </div>
       </button>
 
       {/* Expanded body */}
       {expanded && (
-        <div className="px-5 pb-5 border-t border-white/5 pt-4 space-y-4">
+        <div className="px-5 pb-5 border-t border-white/5 pt-5 space-y-6 relative z-10">
           {/* Deliverable link (shown if submitted) */}
           {milestone.deliverableUrl && (
-            <a
-              href={milestone.deliverableUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 text-xs text-violet-400 hover:text-violet-300 transition-colors"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              View Deliverable
-            </a>
+            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4">
+              <span className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">Freelancer Deliverable</span>
+              <a
+                href={milestone.deliverableUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                {milestone.deliverableUrl}
+              </a>
+            </div>
           )}
 
           {/* Error / success feedback */}
@@ -241,17 +250,17 @@ export default function MilestoneCard({ jobId, milestone, isClient, isFreelancer
 
           {/* ─── Freelancer Actions ─── */}
           {isFreelancer && account && statusLabel === "Funded" && (
-            <div className="space-y-3">
+            <div className="bg-violet-500/5 border border-violet-500/20 rounded-2xl p-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                  Deliverable Link (optional)
+                <label className="block text-[10px] font-semibold text-zinc-400 mb-2 uppercase tracking-widest">
+                  Deliverable Link (Public URL)
                 </label>
                 <input
                   type="url"
                   value={deliverableInput}
                   onChange={(e) => setDeliverableInput(e.target.value)}
-                  placeholder="https://github.com/..."
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs text-white placeholder-zinc-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all"
+                  placeholder="e.g. https://github.com/... or Google Drive link"
+                  className="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-violet-500/50 focus:bg-black/40 focus:ring-2 focus:ring-violet-500/20 transition-all"
                 />
               </div>
               <button

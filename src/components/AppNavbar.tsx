@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useWallet } from "@/components/WalletContext";
 import { Shield, Menu, X, LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import NotificationDropdown from "./NotificationDropdown";
 
 function truncate(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -65,7 +66,9 @@ export default function AppNavbar() {
         </nav>
 
         {/* Right side */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {session && <NotificationDropdown />}
+          
           {session ? (
             <button
               onClick={handleLogout}

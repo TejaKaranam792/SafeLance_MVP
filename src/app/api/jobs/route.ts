@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   const { data: freelancerJobs, error: freelancerError } = await supabase
     .from("jobs_meta")
     .select("chain_job_id, title, description, client_address, freelancer_address, created_at, freelancer_status")
-    .ilike("freelancer_address", normalizedAddress)
+    .ilike("freelancer_address", `%${normalizedAddress}%`)
     .order("created_at", { ascending: false });
 
   if (clientError || freelancerError) {

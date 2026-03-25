@@ -6,7 +6,6 @@ import { ethers } from "ethers";
 export interface JobData {
   id: number;
   client: string;
-  freelancer: string;
   title: string;
   description: string;
   totalFunded: bigint;
@@ -28,9 +27,12 @@ export default function JobCard({ job, freelancerStatus }: JobCardProps) {
   const fundedEth = ethers.formatEther(job.totalFunded);
 
   return (
-    <div className="group relative w-full h-full flex flex-col rounded-2xl border border-white/8 bg-white/3 p-5 backdrop-blur transition-all duration-300 hover:border-white/15 hover:bg-white/5 hover:shadow-2xl hover:shadow-black/30">
+    <div className="group relative w-full h-full flex flex-col rounded-3xl border border-white/5 bg-zinc-900/40 p-6 backdrop-blur-xl transition-all duration-500 hover:-translate-y-1.5 hover:border-white/10 hover:bg-zinc-900/60 hover:shadow-[0_8px_40px_rgba(139,92,246,0.15)] overflow-hidden">
+      {/* Subtle background glow */}
+      <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-violet-500/10 blur-[60px] pointer-events-none group-hover:bg-violet-500/20 transition-all duration-700" />
+      
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="relative flex items-start justify-between gap-3 mb-5 z-10">
         <div className="flex items-center gap-2 max-w-[70%]">
           <span className="text-xs font-mono text-zinc-500">#{job.id}</span>
           <span className="text-sm font-semibold text-white truncate">{job.title || "Untitled Job"}</span>
@@ -64,24 +66,18 @@ export default function JobCard({ job, freelancerStatus }: JobCardProps) {
         {job.description}
       </p>
 
-      {/* Addresses */}
-      <div className="space-y-1.5 text-xs text-zinc-500 mb-4">
-        <div className="flex justify-between">
-          <span>Client</span>
-          <span className="font-mono text-zinc-400">{truncate(job.client)}</span>
+      {/* Addresses and Stats */}
+      <div className="relative space-y-2 text-xs text-zinc-500 mb-6 z-10">
+        <div className="flex justify-between items-center bg-white/[0.02] rounded-lg px-3 py-2">
+          <span className="uppercase tracking-widest text-[10px] font-semibold">Client</span>
+          <span className="font-mono text-zinc-400 bg-black/20 px-2 py-0.5 rounded-md">{truncate(job.client)}</span>
         </div>
-        <div className="flex justify-between">
-          <span>Freelancer</span>
-          <span className="font-mono text-zinc-400">
-            {truncate(job.freelancer)}
-          </span>
+        <div className="flex justify-between items-center bg-white/[0.02] rounded-lg px-3 py-2">
+          <span className="uppercase tracking-widest text-[10px] font-semibold">Milestones</span>
+          <span className="text-zinc-300 font-bold">{job.milestoneCount} Phases</span>
         </div>
-        <div className="flex justify-between">
-          <span>Milestones</span>
-          <span className="text-zinc-400">{job.milestoneCount}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Created</span>
+        <div className="flex justify-between items-center px-3 py-1">
+          <span className="uppercase tracking-widest text-[10px] font-semibold text-zinc-600">Created</span>
           <span>
             {new Date(Number(job.createdAt) * 1000).toLocaleDateString()}
           </span>
@@ -89,12 +85,12 @@ export default function JobCard({ job, freelancerStatus }: JobCardProps) {
       </div>
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-2">
+      <div className="relative flex flex-wrap gap-2 mt-auto pt-3 z-10">
         <Link
           href={`/jobs/${job.id}`}
-          className="w-full text-center flex-none rounded-xl border border-violet-500/30 bg-violet-500/8 hover:bg-violet-500/15 px-3 py-2 text-xs font-semibold text-violet-400 hover:text-violet-300 transition-all duration-200"
+          className="w-full text-center flex-none rounded-xl border border-violet-500/20 bg-violet-500/10 hover:bg-violet-500 hover:border-violet-400 hover:shadow-[0_0_20px_rgba(139,92,246,0.4)] px-3 py-3 text-xs font-bold text-violet-300 hover:text-white transition-all duration-300 group-hover:bg-violet-600 group-hover:text-white"
         >
-          View Details &amp; Milestones →
+          View Escrow Details →
         </Link>
       </div>
     </div>

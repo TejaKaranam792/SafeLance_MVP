@@ -24,10 +24,10 @@ async function fetchAllJobs(): Promise<JobData[]> {
     contract
       .getJob(i)
       .then(
-        ([client, freelancer, title, description, totalFunded, createdAt, milestoneCount]: [
-          string, string, string, string, bigint, bigint, number
+        ([client, title, description, totalFunded, createdAt, milestoneCount]: [
+          string, string, string, bigint, bigint, number
         ]) => {
-          jobs.push({ id: i, client, freelancer, title, description, totalFunded, createdAt, milestoneCount: Number(milestoneCount) });
+          jobs.push({ id: i, client, title, description, totalFunded, createdAt, milestoneCount: Number(milestoneCount) });
         }
       )
       .catch(() => null)
@@ -120,8 +120,8 @@ export default function DashboardPage() {
           const job = allJobs.find((j) => j.id === jobId);
           
           if (!job) return;
-          const isMeFreelancer = job.freelancer.toLowerCase() === account.toLowerCase();
           const isMeClient = job.client.toLowerCase() === account.toLowerCase();
+          const isMeFreelancer = !isMeClient; // if we are in this list and not the client, we are a freelancer
 
           // 1. Freelancer needs to Accept or Reject
           if (isMeFreelancer && status === "pending") {
@@ -221,7 +221,7 @@ export default function DashboardPage() {
           </Link>
           <Link
             href="/app"
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition-all duration-200"
+            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 hover:bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] hover:-translate-y-0.5 border border-violet-500/30 transition-all duration-300"
           >
             <Plus className="h-4 w-4" />
             Create Job
@@ -303,15 +303,18 @@ export default function DashboardPage() {
             </div>
           </div>
         ) : myJobs.length === 0 ? (
-          <div className="rounded-2xl border border-white/8 bg-white/3 p-16 text-center">
-            <p className="text-3xl mb-3">📋</p>
-            <p className="text-sm font-medium text-white mb-1">No jobs yet</p>
-            <p className="text-xs text-zinc-500">
-              You haven't created or been hired for any jobs.{" "}
-              <Link href="/app" className="text-violet-400 hover:text-violet-300 underline">
-                Create a job →
-              </Link>
+          <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.01] p-16 text-center flex flex-col items-center justify-center relative overflow-hidden group transition-all duration-500 hover:border-white/20">
+            <div className="absolute inset-0 bg-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="bg-white/5 rounded-full p-4 mb-4 ring-1 ring-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
+              <p className="text-3xl">🗂️</p>
+            </div>
+            <p className="text-base font-semibold text-white mb-1.5 relative z-10">No jobs yet</p>
+            <p className="text-sm text-zinc-400 relative z-10 max-w-sm">
+              You haven't created or been hired for any jobs yet. Start your journey by creating a new job.
             </p>
+            <Link href="/app" className="mt-5 rounded-xl bg-white/5 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/10 hover:bg-white/10 hover:ring-white/20 transition-all z-10">
+              Create a job →
+            </Link>
           </div>
         ) : (
           <div className="space-y-8">
@@ -326,7 +329,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {actionRequiredJobs.map((job) => {
-                    const isMeFreelancer = job.freelancer.toLowerCase() === account?.toLowerCase();
+                    const isMeClient = job.client.toLowerCase() === account?.toLowerCase();
+                    const isMeFreelancer = !isMeClient;
                     const status = myJobsMeta[job.id];
                     
                     return (
@@ -392,15 +396,18 @@ export default function DashboardPage() {
       ) : (
         /* ── ALL JOBS ─────────────────────────────────── */
         displayJobs.length === 0 ? (
-          <div className="rounded-2xl border border-white/8 bg-white/3 p-16 text-center">
-            <p className="text-3xl mb-3">📋</p>
-            <p className="text-sm font-medium text-white mb-1">No jobs found</p>
-            <p className="text-xs text-zinc-500">
-              No jobs yet.{" "}
-              <Link href="/app" className="text-violet-400 hover:text-violet-300 underline">
-                Create your first job →
-              </Link>
+          <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.01] p-16 text-center flex flex-col items-center justify-center relative overflow-hidden group transition-all duration-500 hover:border-white/20">
+            <div className="absolute inset-0 bg-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="bg-white/5 rounded-full p-4 mb-4 ring-1 ring-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
+              <p className="text-3xl">📋</p>
+            </div>
+            <p className="text-base font-semibold text-white mb-1.5 relative z-10">No jobs found</p>
+            <p className="text-sm text-zinc-400 relative z-10 max-w-sm">
+              There are currently no active jobs on the platform. Let's fix that!
             </p>
+            <Link href="/app" className="mt-5 rounded-xl bg-white/5 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/10 hover:bg-white/10 hover:ring-white/20 transition-all z-10">
+              Create your first job →
+            </Link>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

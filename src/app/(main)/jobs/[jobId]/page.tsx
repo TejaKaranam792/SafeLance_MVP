@@ -12,7 +12,6 @@ import ChatBox from "@/components/ChatBox";
 
 interface JobOnChain {
   client: string;
-  freelancer: string;
   title: string;
   description: string;
   totalFunded: bigint;
@@ -53,12 +52,11 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
       const contract = new ethers.Contract(MILESTONE_CONTRACT_ADDRESS, MILESTONE_ABI, provider);
 
       // Fetch job on-chain
-      const [client, freelancer, title, description, totalFunded, createdAt, milestoneCount] =
+      const [client, title, description, totalFunded, createdAt, milestoneCount] =
         await contract.getJob(numJobId);
 
       const jobData: JobOnChain = {
         client,
-        freelancer,
         title,
         description,
         totalFunded,
@@ -70,8 +68,9 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
       // Fetch each milestone on-chain
       const msPromises = Array.from({ length: Number(milestoneCount) }, (_, i) =>
         contract.getMilestone(numJobId, i).then(
-          ([msTitle, amount, status, fundedAt, releasedAt]: [string, bigint, number, bigint, bigint]) => ({
+          ([freelancer, msTitle, amount, status, fundedAt, releasedAt]: [string, string, bigint, number, bigint, bigint]) => ({
             index: i,
+            freelancer,
             title: msTitle,
             amount,
             status: status as MilestoneStatusKey,
@@ -124,7 +123,10 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
   }, [loadJobData]);
 
   const isClient = account?.toLowerCase() === job?.client.toLowerCase();
-  const isFreelancer = account?.toLowerCase() === job?.freelancer.toLowerCase();
+  
+  // A user is a freelancer if they are assigned to AT LEAST one milestone in this job
+  const isFreelancer = milestones.some(m => m.freelancer.toLowerCase() === account?.toLowerCase());
+  const uniqueFreelancers = Array.from(new Set(milestones.map(m => m.freelancer)));
 
   const totalEth = milestones.reduce((sum, ms) => sum + ms.amount, 0n);
   const fundedEth = milestones
@@ -303,34 +305,53 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
 
         {/* Parties */}
         <div className="flex flex-col sm:flex-row gap-3">
-          {[
-            { role: "Client", address: job.client },
-            { role: "Freelancer", address: job.freelancer },
-          ].map(({ role, address }) => (
-            <div key={role} className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/3 px-4 py-3 flex-1">
-              <div>
-                <p className="text-[11px] text-zinc-500 mb-0.5">{role}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-white">{shortAddr(address)}</span>
-                  <button
-                    onClick={() => copyAddress(address)}
-                    className="text-zinc-600 hover:text-zinc-400 transition-colors"
-                    title="Copy address"
-                  >
-                    {copied ? <CheckCircle className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                  </button>
-                  <a
-                    href={`https://sepolia.etherscan.io/address/${address}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-zinc-600 hover:text-violet-400 transition-colors"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </div>
+          <div className="flex items-center gap-3 rounded-xl border border-white/8 bg-white/3 px-4 py-3 flex-1">
+            <div>
+              <p className="text-[11px] text-zinc-500 mb-0.5">Client</p>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-white">{shortAddr(job.client)}</span>
+                <button
+                  onClick={() => copyAddress(job.client)}
+                  className="text-zinc-600 hover:text-zinc-400 transition-colors"
+                  title="Copy address"
+                >
+                  {copied ? <CheckCircle className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+                <a
+                  href={`https://sepolia.etherscan.io/address/${job.client}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-zinc-600 hover:text-violet-400 transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
               </div>
             </div>
-          ))}
+          </div>
+          
+          <div className="flex flex-col gap-2 rounded-xl border border-white/8 bg-white/3 px-4 py-3 flex-1">
+            <p className="text-[11px] text-zinc-500 mb-0.5">Freelancers</p>
+            {uniqueFreelancers.map((addr) => (
+              <div key={addr} className="flex items-center gap-2">
+                <span className="text-xs font-mono text-white">{shortAddr(addr)}</span>
+                <button
+                  onClick={() => copyAddress(addr)}
+                  className="text-zinc-600 hover:text-zinc-400 transition-colors"
+                  title="Copy address"
+                >
+                  {copied ? <CheckCircle className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                </button>
+                <a
+                  href={`https://sepolia.etherscan.io/address/${addr}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-zinc-600 hover:text-violet-400 transition-colors"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -363,7 +384,6 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
                 deliverableUrl: metaMilestones[ms.index]?.deliverableUrl,
               }}
               isClient={isClient}
-              isFreelancer={isFreelancer}
               freelancerStatus={freelancerStatus}
               onRefresh={loadJobData}
             />
@@ -371,8 +391,8 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
         </div>
       </div>
 
-      {/* Chat System */}
-      <ChatBox jobId={numJobId} clientAddress={job.client} freelancerAddress={job.freelancer} />
+      {/* Chat System (Using the first freelancer for the chat channel for backwards compatibility) */}
+      <ChatBox jobId={numJobId} clientAddress={job.client} freelancerAddress={uniqueFreelancers[0]} />
     </div>
   );
 }

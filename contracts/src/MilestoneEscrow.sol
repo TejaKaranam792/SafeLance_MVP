@@ -9,8 +9,8 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
  * @title MilestoneEscrow
  * @notice Gasless freelance escrow with milestone-based payments.
  *         Clients create jobs with N milestones; each milestone is funded and
- *         released independently. All actions support meta-transactions so
- *         users never pay gas.
+ *         released independently and can be assigned to different freelancers. 
+ *         All actions support meta-transactions so users never pay gas.
  */
 contract MilestoneEscrow is ReentrancyGuard {
     using ECDSA for bytes32;
@@ -29,6 +29,7 @@ contract MilestoneEscrow is ReentrancyGuard {
     }
 
     struct Milestone {
+        address         freelancer;   // <= Assigned per milestone
         string          title;
         uint256         amount;       // ETH locked (wei)
         MilestoneStatus status;
@@ -38,7 +39,6 @@ contract MilestoneEscrow is ReentrancyGuard {
 
     struct Job {
         address client;
-        address freelancer;
         string  title;
         string  description;
         uint256 totalFunded;          // sum of all funded milestones
@@ -63,7 +63,6 @@ contract MilestoneEscrow is ReentrancyGuard {
     event JobCreated(
         uint256 indexed jobId,
         address indexed client,
-        address indexed freelancer,
         string  title,
         uint8   milestoneCount
     );
@@ -71,6 +70,7 @@ contract MilestoneEscrow is ReentrancyGuard {
     event MilestoneAdded(
         uint256 indexed jobId,
         uint8   indexed milestoneIndex,
+        address indexed freelancer,
         string  title,
         uint256 amount
     );
@@ -161,35 +161,33 @@ contract MilestoneEscrow is ReentrancyGuard {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * @notice Create a job with multiple milestones in a single transaction.
-     * @param freelancer        Address of the freelancer.
+     * @notice Create a job with multiple milestones, assigning each to potentially different freelancers.
      * @param title             Job title.
      * @param description       Full job description.
      * @param milestoneTitles   Array of milestone title strings.
      * @param milestoneAmounts  Array of ETH amounts (wei) per milestone.
+     * @param freelancerAddresses Array of addresses representing the freelancer per milestone.
      * @return jobId            The newly created job ID.
      */
     function createJobWithMilestones(
-        address freelancer,
         string  calldata title,
         string  calldata description,
         string[] calldata milestoneTitles,
-        uint256[] calldata milestoneAmounts
+        uint256[] calldata milestoneAmounts,
+        address[] calldata freelancerAddresses
     ) external returns (uint256 jobId) {
         address client = _msgSender();
 
-        require(freelancer != address(0),  "ME: zero freelancer");
-        require(freelancer != client,      "ME: client == freelancer");
         require(bytes(title).length > 0,   "ME: empty title");
         require(milestoneTitles.length > 0,           "ME: no milestones");
-        require(milestoneTitles.length == milestoneAmounts.length, "ME: length mismatch");
+        require(milestoneTitles.length == milestoneAmounts.length, "ME: amount mismatch");
+        require(milestoneTitles.length == freelancerAddresses.length, "ME: freelancer mismatch");
         require(milestoneTitles.length <= 20,          "ME: too many milestones");
 
         jobId = jobCount++;
 
         jobs[jobId] = Job({
             client:         client,
-            freelancer:     freelancer,
             title:          title,
             description:    description,
             totalFunded:    0,
@@ -198,29 +196,28 @@ contract MilestoneEscrow is ReentrancyGuard {
         });
 
         for (uint8 i = 0; i < uint8(milestoneTitles.length); i++) {
-            require(milestoneAmounts[i] > 0, "ME: milestone amount must be > 0");
+            require(milestoneAmounts[i] > 0, "ME: ms amount must be > 0");
+            require(freelancerAddresses[i] != address(0), "ME: zero freelancer");
+            require(freelancerAddresses[i] != client, "ME: client == freelancer");
+
             milestones[jobId][i] = Milestone({
+                freelancer: freelancerAddresses[i],
                 title:      milestoneTitles[i],
                 amount:     milestoneAmounts[i],
                 status:     MilestoneStatus.Pending,
                 fundedAt:   0,
                 releasedAt: 0
             });
-            emit MilestoneAdded(jobId, i, milestoneTitles[i], milestoneAmounts[i]);
+            emit MilestoneAdded(jobId, i, freelancerAddresses[i], milestoneTitles[i], milestoneAmounts[i]);
         }
 
-        emit JobCreated(jobId, client, freelancer, title, uint8(milestoneTitles.length));
+        emit JobCreated(jobId, client, title, uint8(milestoneTitles.length));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Core: Payments
     // ─────────────────────────────────────────────────────────────────────────
 
-    /**
-     * @notice Client funds a specific milestone by sending the exact ETH amount.
-     * @param jobId            The job ID.
-     * @param milestoneIndex   Which milestone (0-based).
-     */
     function fundMilestone(uint256 jobId, uint8 milestoneIndex)
         external payable nonReentrant
     {
@@ -241,11 +238,6 @@ contract MilestoneEscrow is ReentrancyGuard {
         emit MilestoneFunded(jobId, milestoneIndex, msg.value);
     }
 
-    /**
-     * @notice Freelancer marks a milestone as submitted (work done).
-     * @param jobId            The job ID.
-     * @param milestoneIndex   Which milestone (0-based).
-     */
     function submitMilestone(uint256 jobId, uint8 milestoneIndex)
         external nonReentrant
     {
@@ -254,7 +246,7 @@ contract MilestoneEscrow is ReentrancyGuard {
         Milestone storage ms = milestones[jobId][milestoneIndex];
 
         require(job.client != address(0),            "ME: job not found");
-        require(sender == job.freelancer,             "ME: not the freelancer");
+        require(sender == ms.freelancer,              "ME: not the assigned freelancer");
         require(milestoneIndex < job.milestoneCount,  "ME: bad index");
         require(ms.status == MilestoneStatus.Funded,  "ME: not funded");
 
@@ -263,11 +255,6 @@ contract MilestoneEscrow is ReentrancyGuard {
         emit MilestoneSubmitted(jobId, milestoneIndex);
     }
 
-    /**
-     * @notice Client approves a milestone — releases ETH to the freelancer.
-     * @param jobId            The job ID.
-     * @param milestoneIndex   Which milestone (0-based).
-     */
     function approveMilestone(uint256 jobId, uint8 milestoneIndex)
         external nonReentrant
     {
@@ -278,7 +265,6 @@ contract MilestoneEscrow is ReentrancyGuard {
         require(job.client != address(0),              "ME: job not found");
         require(sender == job.client,                  "ME: not the client");
         require(milestoneIndex < job.milestoneCount,   "ME: bad index");
-        // Allow approve from Funded or Submitted
         require(
             ms.status == MilestoneStatus.Funded ||
             ms.status == MilestoneStatus.Submitted,
@@ -286,7 +272,7 @@ contract MilestoneEscrow is ReentrancyGuard {
         );
 
         uint256 amount     = ms.amount;
-        address freelancer = job.freelancer;
+        address freelancer = ms.freelancer;
 
         // CEI pattern
         ms.status      = MilestoneStatus.Approved;
@@ -300,12 +286,6 @@ contract MilestoneEscrow is ReentrancyGuard {
         emit MilestoneApproved(jobId, milestoneIndex, freelancer, amount);
     }
 
-    /**
-     * @notice Client raises a dispute on a funded/submitted milestone.
-     *         Halts the milestone; manual refund can follow.
-     * @param jobId            The job ID.
-     * @param milestoneIndex   Which milestone (0-based).
-     */
     function disputeMilestone(uint256 jobId, uint8 milestoneIndex)
         external nonReentrant
     {
@@ -327,11 +307,6 @@ contract MilestoneEscrow is ReentrancyGuard {
         emit MilestoneDisputed(jobId, milestoneIndex);
     }
 
-    /**
-     * @notice Client refunds a disputed or pending milestone back to themselves.
-     * @param jobId            The job ID.
-     * @param milestoneIndex   Which milestone (0-based).
-     */
     function refundMilestone(uint256 jobId, uint8 milestoneIndex)
         external nonReentrant
     {
@@ -370,7 +345,6 @@ contract MilestoneEscrow is ReentrancyGuard {
         external view
         returns (
             address client,
-            address freelancer,
             string memory title,
             string memory description,
             uint256 totalFunded,
@@ -382,7 +356,6 @@ contract MilestoneEscrow is ReentrancyGuard {
         require(job.client != address(0), "ME: job not found");
         return (
             job.client,
-            job.freelancer,
             job.title,
             job.description,
             job.totalFunded,
@@ -394,6 +367,7 @@ contract MilestoneEscrow is ReentrancyGuard {
     function getMilestone(uint256 jobId, uint8 milestoneIndex)
         external view
         returns (
+            address freelancer,
             string memory title,
             uint256 amount,
             MilestoneStatus status,
@@ -405,14 +379,13 @@ contract MilestoneEscrow is ReentrancyGuard {
         require(job.client != address(0), "ME: job not found");
         require(milestoneIndex < job.milestoneCount, "ME: bad index");
         Milestone storage ms = milestones[jobId][milestoneIndex];
-        return (ms.title, ms.amount, ms.status, ms.fundedAt, ms.releasedAt);
+        return (ms.freelancer, ms.title, ms.amount, ms.status, ms.fundedAt, ms.releasedAt);
     }
 
     function getNonce(address user) external view returns (uint256) {
         return nonces[user];
     }
 
-    // Reject accidental ETH sends
     receive() external payable {
         revert("ME: use fundMilestone");
     }

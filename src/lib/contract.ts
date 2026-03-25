@@ -27,10 +27,10 @@ export const MILESTONE_ABI = [
   // View
   "function jobCount() view returns (uint256)",
   "function getNonce(address user) view returns (uint256)",
-  "function getJob(uint256 jobId) view returns (address client, address freelancer, string title, string description, uint256 totalFunded, uint256 createdAt, uint8 milestoneCount)",
-  "function getMilestone(uint256 jobId, uint8 milestoneIndex) view returns (string title, uint256 amount, uint8 status, uint256 fundedAt, uint256 releasedAt)",
+  "function getJob(uint256 jobId) view returns (address client, string title, string description, uint256 totalFunded, uint256 createdAt, uint8 milestoneCount)",
+  "function getMilestone(uint256 jobId, uint8 milestoneIndex) view returns (address freelancer, string title, uint256 amount, uint8 status, uint256 fundedAt, uint256 releasedAt)",
   // Write
-  "function createJobWithMilestones(address freelancer, string title, string description, string[] milestoneTitles, uint256[] milestoneAmounts) returns (uint256 jobId)",
+  "function createJobWithMilestones(string title, string description, string[] milestoneTitles, uint256[] milestoneAmounts, address[] freelancerAddresses) returns (uint256 jobId)",
   "function fundMilestone(uint256 jobId, uint8 milestoneIndex) payable",
   "function submitMilestone(uint256 jobId, uint8 milestoneIndex)",
   "function approveMilestone(uint256 jobId, uint8 milestoneIndex)",
@@ -38,8 +38,8 @@ export const MILESTONE_ABI = [
   "function refundMilestone(uint256 jobId, uint8 milestoneIndex)",
   "function executeMetaTx(address from, bytes functionData, bytes signature) returns (bytes)",
   // Events
-  "event JobCreated(uint256 indexed jobId, address indexed client, address indexed freelancer, string title, uint8 milestoneCount)",
-  "event MilestoneAdded(uint256 indexed jobId, uint8 indexed milestoneIndex, string title, uint256 amount)",
+  "event JobCreated(uint256 indexed jobId, address indexed client, string title, uint8 milestoneCount)",
+  "event MilestoneAdded(uint256 indexed jobId, uint8 indexed milestoneIndex, address indexed freelancer, string title, uint256 amount)",
   "event MilestoneFunded(uint256 indexed jobId, uint8 indexed milestoneIndex, uint256 amount)",
   "event MilestoneSubmitted(uint256 indexed jobId, uint8 indexed milestoneIndex)",
   "event MilestoneApproved(uint256 indexed jobId, uint8 indexed milestoneIndex, address indexed freelancer, uint256 amount)",
