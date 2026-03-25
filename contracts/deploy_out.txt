@@ -1,0 +1,7 @@
+
+> freelance-escrow-contracts@1.0.0 deploy:amoy
+> hardhat run scripts/deploy.ts --network amoy
+
+Deploying FreelanceEscrow with account: 0xBf7b285440B3c59f05b693B343378e19ebd33bd4
+Account balance: 0.1 ETH
+Terminate batch job (Y/N)? ^C

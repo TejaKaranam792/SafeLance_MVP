@@ -1,0 +1,51 @@
+
+> freelance-escrow@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.0
+  - Local:        http://localhost:3000
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.9s
+ ○ Compiling / ...
+ ⨯ src\app\layout.tsx
+An error occurred in `next/font`.
+
+Error [ERR_UNSUPPORTED_ESM_URL_SCHEME]: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'
+    at throwIfUnsupportedURLScheme (node:internal/modules/esm/load:209:11)
+    at defaultLoad (node:internal/modules/esm/load:107:3)
+    at ModuleLoader.load (node:internal/modules/esm/loader:701:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:514:43)
+    at #createModuleJob (node:internal/modules/esm/loader:538:36)
+    at #getJobFromResolveResult (node:internal/modules/esm/loader:306:34)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:274:41)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:577:25)
+ ⨯ src\app\layout.tsx
+An error occurred in `next/font`.
+
+Error [ERR_UNSUPPORTED_ESM_URL_SCHEME]: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'
+    at throwIfUnsupportedURLScheme (node:internal/modules/esm/load:209:11)
+    at defaultLoad (node:internal/modules/esm/load:107:3)
+    at ModuleLoader.load (node:internal/modules/esm/loader:701:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:514:43)
+    at #createModuleJob (node:internal/modules/esm/loader:538:36)
+    at #getJobFromResolveResult (node:internal/modules/esm/loader:306:34)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:274:41)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:577:25)
+ ⨯ src\app\layout.tsx
+An error occurred in `next/font`.
+
+Error [ERR_UNSUPPORTED_ESM_URL_SCHEME]: Only URLs with a scheme in: file, data, and node are supported by the default ESM loader. On Windows, absolute paths must be valid file:// URLs. Received protocol 'c:'
+    at throwIfUnsupportedURLScheme (node:internal/modules/esm/load:209:11)
+    at defaultLoad (node:internal/modules/esm/load:107:3)
+    at ModuleLoader.load (node:internal/modules/esm/loader:701:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:514:43)
+    at #createModuleJob (node:internal/modules/esm/loader:538:36)
+    at #getJobFromResolveResult (node:internal/modules/esm/loader:306:34)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:274:41)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:577:25)
+ GET / 500 in 13307ms
+ ✓ Compiled /_error in 117ms (49 modules)
+Terminate batch job (Y/N)? [?25h
+Terminate batch job (Y/N)? 

@@ -1,0 +1,12 @@
+
+> freelance-escrow-contracts@1.0.0 deploy:sepolia
+> hardhat run scripts/deploy.ts --network sepolia
+
+Deploying FreelanceEscrow with account: 0xBf7b285440B3c59f05b693B343378e19ebd33bd4
+Account balance: 0.09575065031252984 ETH
+FreelanceEscrow deployed to: 0xf0990EdB84E4160F231355804aD3582D1a266f59
+Chain ID: 11155111n
+Deployment info saved to deployments/FreelanceEscrow.json
+
+⚠️  Add to your .env.local:
+NEXT_PUBLIC_CONTRACT_ADDRESS=0xf0990EdB84E4160F231355804aD3582D1a266f59
