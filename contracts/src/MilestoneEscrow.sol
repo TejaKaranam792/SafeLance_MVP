@@ -5,12 +5,23 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
+// Minimal interface to avoid circular imports
+interface IReputationRegistry {
+    function recordRating(
+        address freelancer,
+        address client,
+        uint256 ethAmount,
+        uint8   stars
+    ) external;
+}
+
 /**
  * @title MilestoneEscrow
  * @notice Gasless freelance escrow with milestone-based payments.
  *         Clients create jobs with N milestones; each milestone is funded and
- *         released independently and can be assigned to different freelancers. 
+ *         released independently and can be assigned to different freelancers.
  *         All actions support meta-transactions so users never pay gas.
+ *         Integrates with ReputationRegistry to record on-chain ratings.
  */
 contract MilestoneEscrow is ReentrancyGuard {
     using ECDSA for bytes32;
@@ -52,9 +63,32 @@ contract MilestoneEscrow is ReentrancyGuard {
 
     uint256 public jobCount;
 
+    /// @notice Optional reputation registry — set to address(0) to disable.
+    IReputationRegistry public reputationRegistry;
+
+    /// @notice Admin wallet — sole authority to resolve disputed milestones.
+    address public admin;
+
     mapping(uint256 => Job)                            public jobs;
     mapping(uint256 => mapping(uint8 => Milestone))    public milestones;
     mapping(address => uint256)                        public nonces;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Constructor
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// @param _reputationRegistry Address of ReputationRegistry, or address(0) to skip.
+    /// @param _admin              Admin wallet that can resolve disputed milestones.
+    constructor(address _reputationRegistry, address _admin) {
+        require(_admin != address(0), "ME: zero admin");
+        reputationRegistry = IReputationRegistry(_reputationRegistry);
+        admin = _admin;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "ME: not admin");
+        _;
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Events
@@ -104,6 +138,16 @@ contract MilestoneEscrow is ReentrancyGuard {
         address indexed client,
         uint256 amount
     );
+
+    event DisputeResolved(
+        uint256 indexed jobId,
+        uint8   indexed milestoneIndex,
+        address indexed winner,
+        uint256 amount,
+        bool    releasedToFreelancer
+    );
+
+    event AdminTransferred(address indexed previousAdmin, address indexed newAdmin);
 
     event MetaTxExecuted(address indexed from, uint256 nonce, bool success);
 
@@ -255,7 +299,14 @@ contract MilestoneEscrow is ReentrancyGuard {
         emit MilestoneSubmitted(jobId, milestoneIndex);
     }
 
-    function approveMilestone(uint256 jobId, uint8 milestoneIndex)
+    /**
+     * @notice Approve a milestone and release payment to the freelancer.
+     * @param jobId            The job ID.
+     * @param milestoneIndex   The milestone index.
+     * @param stars            Star rating (1–5) for the freelancer's work.
+     *                         Pass 0 to skip reputation recording.
+     */
+    function approveMilestone(uint256 jobId, uint8 milestoneIndex, uint8 stars)
         external nonReentrant
     {
         address sender = _msgSender();
@@ -270,6 +321,7 @@ contract MilestoneEscrow is ReentrancyGuard {
             ms.status == MilestoneStatus.Submitted,
             "ME: cannot approve"
         );
+        require(stars == 0 || (stars >= 1 && stars <= 5), "ME: invalid stars");
 
         uint256 amount     = ms.amount;
         address freelancer = ms.freelancer;
@@ -284,6 +336,12 @@ contract MilestoneEscrow is ReentrancyGuard {
         require(sent, "ME: ETH transfer failed");
 
         emit MilestoneApproved(jobId, milestoneIndex, freelancer, amount);
+
+        // Record on-chain reputation (non-reverting — don't block payment on reputation failure)
+        if (stars > 0 && address(reputationRegistry) != address(0)) {
+            try reputationRegistry.recordRating(freelancer, sender, amount, stars) {}
+            catch {}
+        }
     }
 
     function disputeMilestone(uint256 jobId, uint8 milestoneIndex)
@@ -317,10 +375,10 @@ contract MilestoneEscrow is ReentrancyGuard {
         require(job.client != address(0),            "ME: job not found");
         require(sender == job.client,                "ME: not the client");
         require(milestoneIndex < job.milestoneCount, "ME: bad index");
+        // Disputed milestones can ONLY be resolved by admin — no self-refund bypass
         require(
-            ms.status == MilestoneStatus.Disputed ||
             ms.status == MilestoneStatus.Funded,
-            "ME: cannot refund"
+            "ME: cannot refund; use admin resolution for disputes"
         );
         require(ms.amount > 0, "ME: nothing to refund");
 
@@ -335,6 +393,55 @@ contract MilestoneEscrow is ReentrancyGuard {
         require(sent, "ME: ETH transfer failed");
 
         emit MilestoneRefunded(jobId, milestoneIndex, sender, amount);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Admin: Dispute Resolution
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * @notice Resolve a disputed milestone. Only callable by the admin.
+     * @param jobId                  The job ID.
+     * @param milestoneIndex         The milestone index.
+     * @param releaseToFreelancer    true → pay freelancer; false → refund client.
+     */
+    function adminResolveMilestone(
+        uint256 jobId,
+        uint8   milestoneIndex,
+        bool    releaseToFreelancer
+    ) external nonReentrant onlyAdmin {
+        Job storage job = jobs[jobId];
+        Milestone storage ms = milestones[jobId][milestoneIndex];
+
+        require(job.client != address(0),              "ME: job not found");
+        require(milestoneIndex < job.milestoneCount,   "ME: bad index");
+        require(ms.status == MilestoneStatus.Disputed, "ME: not disputed");
+        require(ms.amount > 0,                         "ME: nothing to resolve");
+
+        uint256 amount  = ms.amount;
+        address winner  = releaseToFreelancer ? ms.freelancer : job.client;
+
+        // CEI pattern
+        ms.amount       = 0;
+        ms.status       = releaseToFreelancer
+                            ? MilestoneStatus.Approved
+                            : MilestoneStatus.Refunded;
+        ms.releasedAt   = block.timestamp;
+        job.totalFunded -= amount;
+
+        (bool sent, ) = payable(winner).call{value: amount}("");
+        require(sent, "ME: ETH transfer failed");
+
+        emit DisputeResolved(jobId, milestoneIndex, winner, amount, releaseToFreelancer);
+    }
+
+    /**
+     * @notice Transfer admin role to a new address.
+     */
+    function transferAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0), "ME: zero admin");
+        emit AdminTransferred(admin, newAdmin);
+        admin = newAdmin;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -10,6 +10,11 @@ CREATE TABLE IF NOT EXISTS freelancers (
     skills TEXT NOT NULL,
     portfolio TEXT,
     hourly_rate NUMERIC(10, 2),   -- USD per hour (e.g. 75.00)
+    bio TEXT,                      -- short freelancer bio
+    avatar_url TEXT,               -- profile picture URL
+    github_url TEXT,               -- GitHub profile link
+    twitter_url TEXT,              -- Twitter/X profile link
+    verified_badge BOOLEAN DEFAULT false,  -- true when >=3 milestones completed on-chain
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
@@ -40,10 +45,28 @@ CREATE TABLE IF NOT EXISTS milestones (
     UNIQUE(chain_job_id, milestone_index)
 );
 
+-- ─── Ratings ──────────────────────────────────────────────────────────────────
+-- Off-chain mirror of on-chain ratings for fast reads + comment storage.
+-- On-chain ReputationRegistry is the authoritative score source.
+CREATE TABLE IF NOT EXISTS ratings (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    freelancer_address TEXT NOT NULL,
+    client_address TEXT NOT NULL,
+    chain_job_id TEXT NOT NULL,
+    milestone_index INTEGER NOT NULL,
+    stars INTEGER NOT NULL CHECK (stars BETWEEN 1 AND 5),
+    comment TEXT,                   -- optional review text
+    eth_amount TEXT NOT NULL,       -- wei as string (safe bigint handling)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+    UNIQUE(chain_job_id, milestone_index)
+);
+
 -- ─── Indexes ─────────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_milestones_job_id ON milestones(chain_job_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_meta_client  ON jobs_meta(client_address);
 CREATE INDEX IF NOT EXISTS idx_jobs_meta_freelancer ON jobs_meta(freelancer_address);
+CREATE INDEX IF NOT EXISTS idx_ratings_freelancer ON ratings(freelancer_address);
+CREATE INDEX IF NOT EXISTS idx_ratings_client ON ratings(client_address);
 
 -- ─── Row Level Security (Optional but recommended) ───────────────────────────
 -- Uncomment below to enable public reads:
@@ -57,3 +80,39 @@ CREATE INDEX IF NOT EXISTS idx_jobs_meta_freelancer ON jobs_meta(freelancer_addr
 -- CREATE POLICY "Anyone insert" ON jobs_meta    FOR INSERT WITH CHECK (true);
 -- CREATE POLICY "Anyone insert/update" ON milestones FOR INSERT WITH CHECK (true);
 -- CREATE POLICY "Anyone update deliverable" ON milestones FOR UPDATE USING (true);
+
+-- ─── Disputes ─────────────────────────────────────────────────────────────────
+-- Off-chain record of each dispute, evidence, and admin ruling.
+-- On-chain MilestoneEscrow.adminResolveMilestone() is the authoritative settlement.
+CREATE TABLE IF NOT EXISTS disputes (
+    id                      UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    chain_job_id            TEXT NOT NULL,
+    milestone_index         INTEGER NOT NULL,
+    client_address          TEXT NOT NULL,
+    freelancer_address      TEXT NOT NULL,
+
+    -- Evidence submitted by each party
+    client_statement        TEXT,
+    client_evidence_url     TEXT,          -- uploaded file URL (Supabase Storage)
+    freelancer_statement    TEXT,
+    freelancer_evidence_url TEXT,
+
+    -- Lifecycle
+    -- 'open' | 'client_submitted' | 'freelancer_submitted'
+    -- | 'evidence_complete' | 'resolved_freelancer' | 'resolved_client'
+    status                  TEXT NOT NULL DEFAULT 'open',
+
+    -- Admin ruling
+    admin_notes             TEXT,
+    resolved_at             TIMESTAMP WITH TIME ZONE,
+
+    created_at              TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+
+    UNIQUE(chain_job_id, milestone_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_disputes_status      ON disputes(status);
+CREATE INDEX IF NOT EXISTS idx_disputes_client      ON disputes(client_address);
+CREATE INDEX IF NOT EXISTS idx_disputes_freelancer  ON disputes(freelancer_address);
+CREATE INDEX IF NOT EXISTS idx_disputes_job         ON disputes(chain_job_id);
+

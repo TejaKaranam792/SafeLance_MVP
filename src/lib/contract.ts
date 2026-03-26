@@ -37,6 +37,10 @@ export const MILESTONE_ABI = [
   "function disputeMilestone(uint256 jobId, uint8 milestoneIndex)",
   "function refundMilestone(uint256 jobId, uint8 milestoneIndex)",
   "function executeMetaTx(address from, bytes functionData, bytes signature) returns (bytes)",
+  // Admin
+  "function admin() view returns (address)",
+  "function adminResolveMilestone(uint256 jobId, uint8 milestoneIndex, bool releaseToFreelancer)",
+  "function transferAdmin(address newAdmin)",
   // Events
   "event JobCreated(uint256 indexed jobId, address indexed client, string title, uint8 milestoneCount)",
   "event MilestoneAdded(uint256 indexed jobId, uint8 indexed milestoneIndex, address indexed freelancer, string title, uint256 amount)",
@@ -45,8 +49,13 @@ export const MILESTONE_ABI = [
   "event MilestoneApproved(uint256 indexed jobId, uint8 indexed milestoneIndex, address indexed freelancer, uint256 amount)",
   "event MilestoneDisputed(uint256 indexed jobId, uint8 indexed milestoneIndex)",
   "event MilestoneRefunded(uint256 indexed jobId, uint8 indexed milestoneIndex, address indexed client, uint256 amount)",
+  "event DisputeResolved(uint256 indexed jobId, uint8 indexed milestoneIndex, address indexed winner, uint256 amount, bool releasedToFreelancer)",
+  "event AdminTransferred(address indexed previousAdmin, address indexed newAdmin)",
   "event MetaTxExecuted(address indexed from, uint256 nonce, bool success)",
 ] as const;
+
+// Alias used by admin dashboard
+export const milestoneEscrowAbi = MILESTONE_ABI;
 
 export const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";

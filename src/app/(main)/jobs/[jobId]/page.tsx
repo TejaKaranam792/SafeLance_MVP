@@ -35,7 +35,7 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [freelancerStatus, setFreelancerStatus] = useState<string>("pending");
+  const [freelancerStatuses, setFreelancerStatuses] = useState<Record<string, string>>({});
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const numJobId = Number(jobId);
@@ -105,7 +105,20 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
       if (metaRes2.ok) {
         const jobMeta = await metaRes2.json();
         if (jobMeta && jobMeta.freelancer_status) {
-          setFreelancerStatus(jobMeta.freelancer_status);
+          if (jobMeta.freelancer_status.startsWith("{")) {
+            try {
+              setFreelancerStatuses(JSON.parse(jobMeta.freelancer_status));
+            } catch (e) {
+              console.error("Failed to parse freelancer_status JSON", e);
+            }
+          } else {
+            // Fallback for legacy global string
+            const legacyObj: Record<string, string> = {};
+            uniqueFreelancers.forEach(f => {
+              legacyObj[f.toLowerCase()] = jobMeta.freelancer_status;
+            });
+            setFreelancerStatuses(legacyObj);
+          }
         }
       }
 
@@ -127,6 +140,7 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
   // A user is a freelancer if they are assigned to AT LEAST one milestone in this job
   const isFreelancer = milestones.some(m => m.freelancer.toLowerCase() === account?.toLowerCase());
   const uniqueFreelancers = Array.from(new Set(milestones.map(m => m.freelancer)));
+  const myStatus = account ? (freelancerStatuses[account.toLowerCase()] || "pending") : "pending";
 
   const totalEth = milestones.reduce((sum, ms) => sum + ms.amount, 0n);
   const fundedEth = milestones
@@ -186,29 +200,29 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
       {/* Job Header */}
       <div className="mb-8">
         
-        {/* Status Banner */}
-        {freelancerStatus !== "accepted" && (
+        {/* Status Banner for Freelancers */}
+        {isFreelancer && myStatus !== "accepted" && (
           <div className={`mb-6 rounded-xl border px-5 py-4 ${
-            freelancerStatus === "rejected" 
+            myStatus === "rejected" 
               ? "border-red-500/30 bg-red-500/10" 
               : "border-orange-500/30 bg-orange-500/10"
           }`}>
             <h3 className={`text-sm font-bold mb-1 ${
-              freelancerStatus === "rejected" ? "text-red-400" : "text-orange-400"
+              myStatus === "rejected" ? "text-red-400" : "text-orange-400"
             }`}>
-              {freelancerStatus === "rejected" ? "Offer Rejected" : "Pending Acceptance"}
+              {myStatus === "rejected" ? "Offer Rejected" : "Pending Acceptance"}
             </h3>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <p className={`text-sm ${
-                freelancerStatus === "rejected" ? "text-red-300" : "text-orange-300"
+                myStatus === "rejected" ? "text-red-300" : "text-orange-300"
               }`}>
-                {freelancerStatus === "rejected"
-                  ? isClient ? "The freelancer rejected this job offer. You may cancel or ignore this job." : "You have rejected this job offer."
-                  : isClient ? "Waiting for the freelancer to accept this job offer before they can begin work." : "The client has offered you this job. Please accept or reject it."}
+                {myStatus === "rejected"
+                  ? "You have rejected this job offer. You cannot perform work on it unless the client issues a new offer."
+                  : "The client has offered you this job. Please accept or reject it before beginning work."}
               </p>
               
               {/* Freelancer Accept/Reject Actions Inline */}
-              {isFreelancer && freelancerStatus === "pending" && (
+              {myStatus === "pending" && (
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={async () => {
@@ -247,6 +261,14 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Status for Client */}
+        {isClient && Object.values(freelancerStatuses).some(s => s === "pending" || s === "rejected") && (
+          <div className="mb-6 rounded-xl border border-orange-500/30 bg-orange-500/10 px-5 py-4">
+             <h3 className="text-sm font-bold text-orange-400 mb-1">Awaiting Freelancers</h3>
+             <p className="text-sm text-orange-300">Wait for your assigned freelancers to accept your offer before they begin work.</p>
           </div>
         )}
 
@@ -349,6 +371,13 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
+                {/* SHOW INDIVIDUAL STATUS HERE */}
+                {(() => {
+                  const s = freelancerStatuses[addr.toLowerCase()] || "pending";
+                  if (s === "accepted") return <span className="text-[10px] text-emerald-400 uppercase tracking-wider font-bold">Accepted</span>;
+                  if (s === "rejected") return <span className="text-[10px] text-red-400 uppercase tracking-wider font-bold">Rejected</span>;
+                  return <span className="text-[10px] text-orange-400 uppercase tracking-wider font-bold">Pending</span>;
+                })()}
               </div>
             ))}
           </div>
@@ -384,15 +413,15 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
                 deliverableUrl: metaMilestones[ms.index]?.deliverableUrl,
               }}
               isClient={isClient}
-              freelancerStatus={freelancerStatus}
+              freelancerStatus={freelancerStatuses[ms.freelancer.toLowerCase()] || "pending"}
               onRefresh={loadJobData}
             />
           ))}
         </div>
       </div>
 
-      {/* Chat System (Using the first freelancer for the chat channel for backwards compatibility) */}
-      <ChatBox jobId={numJobId} clientAddress={job.client} freelancerAddress={uniqueFreelancers[0]} />
+      {/* Chat System (All assigned freelancers form a group chat with the Client) */}
+      <ChatBox jobId={numJobId} clientAddress={job.client} freelancerAddresses={uniqueFreelancers} />
     </div>
   );
 }

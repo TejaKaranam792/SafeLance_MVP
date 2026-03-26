@@ -4,8 +4,9 @@ import { useState } from "react";
 import { ethers } from "ethers";
 import {
   CheckCircle, Clock, AlertTriangle, XCircle, DollarSign,
-  ChevronDown, ChevronUp, ExternalLink, Loader2,
+  ChevronDown, ChevronUp, ExternalLink, Loader2, ArrowRight
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { MILESTONE_ABI, MILESTONE_CONTRACT_ADDRESS, MILESTONE_STATUS, type MilestoneStatusKey } from "@/lib/contract";
 import { useWallet } from "@/components/WalletContext";
 
@@ -25,6 +26,7 @@ interface MilestoneCardProps {
   jobId: number;
   milestone: MilestoneData;
   isClient: boolean;
+  clientAddress?: string;  // NEW: client wallet address for rating
   freelancerStatus?: string;
   onRefresh: () => void;
 }
@@ -38,14 +40,120 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; 
   Refunded:  { label: "Refunded",  color: "text-red-400",    bg: "bg-red-500/10",    border: "border-red-500/20",    icon: <XCircle className="h-3 w-3" /> },
 };
 
-export default function MilestoneCard({ jobId, milestone, isClient, freelancerStatus, onRefresh }: MilestoneCardProps) {
+// ── Star Rating Modal ─────────────────────────────────────────────────────────
+interface RatingModalProps {
+  milestoneTitle: string;
+  onConfirm: (stars: number, comment: string) => void;
+  onCancel: () => void;
+}
+
+function RatingModal({ milestoneTitle, onConfirm, onCancel }: RatingModalProps) {
+  const [stars, setStars]     = useState(5);
+  const [hovered, setHovered] = useState(0);
+  const [comment, setComment] = useState("");
+  const displayStars = hovered || stars;
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
+      padding: 24,
+    }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 24, padding: '32px 36px',
+        maxWidth: 440, width: '100%',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+        fontFamily: "'Inter', sans-serif",
+      }}>
+        <div style={{ fontSize: 32, textAlign: 'center', marginBottom: 8 }}>⭐</div>
+        <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 800, textAlign: 'center', margin: '0 0 6px' }}>
+          Rate the Work
+        </h2>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', marginBottom: 24 }}>
+          How was <strong style={{ color: 'rgba(255,255,255,0.75)' }}>{milestoneTitle}</strong>?
+        </p>
+
+        {/* Stars */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 24 }}>
+          {[1,2,3,4,5].map(n => (
+            <button key={n}
+              onClick={() => setStars(n)}
+              onMouseEnter={() => setHovered(n)}
+              onMouseLeave={() => setHovered(0)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 36, lineHeight: 1, padding: '4px 2px',
+                color: n <= displayStars ? '#f59e0b' : 'rgba(255,255,255,0.15)',
+                transform: n <= displayStars ? 'scale(1.15)' : 'scale(1)',
+                transition: 'all 0.15s cubic-bezier(0.4,0,0.2,1)',
+                filter: n <= displayStars ? 'drop-shadow(0 0 6px rgba(245,158,11,0.6))' : 'none',
+              }}
+            >★</button>
+          ))}
+        </div>
+
+        {/* Star label */}
+        <p style={{ textAlign: 'center', fontSize: 13, color: '#f59e0b', fontWeight: 700, marginBottom: 20, minHeight: 20 }}>
+          {['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'][displayStars]}
+        </p>
+
+        {/* Optional comment */}
+        <textarea
+          value={comment}
+          onChange={e => setComment(e.target.value)}
+          placeholder="Leave a review (optional)…"
+          rows={3}
+          style={{
+            width: '100%', background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 12, padding: '12px 14px',
+            color: '#fff', fontSize: 14, fontFamily: 'inherit',
+            resize: 'none', outline: 'none', marginBottom: 24,
+            boxSizing: 'border-box',
+          }}
+        />
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: '12px 0',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 12, color: 'rgba(255,255,255,0.6)',
+            fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}>
+            Cancel
+          </button>
+          <button onClick={() => onConfirm(stars, comment)} style={{
+            flex: 2, padding: '12px 0',
+            background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+            border: 'none', borderRadius: 12, color: '#fff',
+            fontSize: 14, fontWeight: 700, cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(34,197,94,0.3)',
+            fontFamily: 'inherit',
+          }}>
+            Approve & Release ⟠
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function MilestoneCard({ jobId, milestone, isClient, clientAddress, freelancerStatus, onRefresh }: MilestoneCardProps) {
+  const router = useRouter();
   const { provider, account } = useWallet();
   const isFreelancer = account?.toLowerCase() === milestone.freelancer.toLowerCase();
-  const [expanded, setExpanded] = useState(false);
-  const [loading, setLoading] = useState<string | null>(null);
+  const [expanded, setExpanded]       = useState(false);
+  const [loading, setLoading]         = useState<string | null>(null);
   const [deliverableInput, setDeliverableInput] = useState(milestone.deliverableUrl ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [txHash, setTxHash] = useState<string | null>(null);
+  const [error, setError]             = useState<string | null>(null);
+  const [txHash, setTxHash]           = useState<string | null>(null);
+  const [showRating, setShowRating]   = useState(false);  // ← NEW
 
   const statusLabel = MILESTONE_STATUS[milestone.status] as string;
   const config = STATUS_CONFIG[statusLabel] ?? STATUS_CONFIG["Pending"];
@@ -101,10 +209,35 @@ export default function MilestoneCard({ jobId, milestone, isClient, freelancerSt
   }
 
   async function approveMilestone() {
+    // Open rating modal — actual contract call happens in handleApproveConfirmed
+    setShowRating(true);
+  }
+
+  async function handleApproveConfirmed(stars: number, comment: string) {
+    setShowRating(false);
     await handleAction("approve", async () => {
       const contract = await getMilestoneContract();
-      return contract.approveMilestone(jobId, milestone.index);
+      return contract.approveMilestone(jobId, milestone.index, stars);
     });
+
+    // Mirror rating off-chain for fast profile reads
+    try {
+      await fetch("/api/ratings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          freelancer_address: milestone.freelancer,
+          client_address:     clientAddress ?? account ?? "",
+          chain_job_id:       String(jobId),
+          milestone_index:    milestone.index,
+          stars,
+          comment:            comment || undefined,
+          eth_amount:         ethers.formatEther(milestone.amount),
+        }),
+      });
+    } catch (e) {
+      console.warn("[rating] off-chain save failed:", e);
+    }
   }
 
   async function disputeMilestone() {
@@ -112,6 +245,22 @@ export default function MilestoneCard({ jobId, milestone, isClient, freelancerSt
       const contract = await getMilestoneContract();
       return contract.disputeMilestone(jobId, milestone.index);
     });
+    // On success, create off-chain dispute record and redirect
+    try {
+      await fetch("/api/disputes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chain_job_id: String(jobId),
+          milestone_index: milestone.index,
+          client_address: clientAddress ?? account ?? "",
+          freelancer_address: milestone.freelancer,
+        }),
+      });
+      router.push(`/disputes/${jobId}/${milestone.index}`);
+    } catch (e) {
+      console.warn("[dispute] failed to create off-chain record", e);
+    }
   }
 
   async function refundMilestone() {
@@ -248,6 +397,22 @@ export default function MilestoneCard({ jobId, milestone, isClient, freelancerSt
             </div>
           )}
 
+          {/* ─── Shared Actions ─── */}
+          {statusLabel === "Disputed" && (
+            <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h4 className="text-orange-400 font-bold text-sm mb-1">Milestone Disputed</h4>
+                <p className="text-orange-400/70 text-xs">This milestone is currently under arbitration. Please submit your evidence in the Dispute Room.</p>
+              </div>
+              <button
+                onClick={() => router.push(`/disputes/${jobId}/${milestone.index}`)}
+                className="inline-flex items-center gap-2 rounded-lg bg-orange-600 hover:bg-orange-500 px-5 py-2.5 text-xs font-bold text-white transition-all whitespace-nowrap"
+              >
+                Go to Dispute Room <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           {/* ─── Freelancer Actions ─── */}
           {isFreelancer && account && statusLabel === "Funded" && (
             <div className="bg-violet-500/5 border border-violet-500/20 rounded-2xl p-5 space-y-4">
@@ -284,6 +449,14 @@ export default function MilestoneCard({ jobId, milestone, isClient, freelancerSt
             </p>
           )}
         </div>
+      )}
+      {/* Rating modal — rendered at root level for correct z-index */}
+      {showRating && (
+        <RatingModal
+          milestoneTitle={milestone.title}
+          onConfirm={handleApproveConfirmed}
+          onCancel={() => setShowRating(false)}
+        />
       )}
     </div>
   );

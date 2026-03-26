@@ -25,9 +25,20 @@ function AppPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<"client" | "freelancer">(
-    (searchParams?.get("tab") as "client" | "freelancer") || "client"
-  );
+  const [role, setRole] = useState<"client" | "freelancer" | null>(null);
+
+  // Hydrate role
+  useEffect(() => {
+    const saved = localStorage.getItem("safelance_role");
+    if (saved === "client" || saved === "freelancer") {
+      setRole(saved);
+    }
+  }, []);
+
+  const selectRole = (r: "client" | "freelancer") => {
+    localStorage.setItem("safelance_role", r);
+    setRole(r);
+  };
 
   // Job form fields
   const [jobTitle, setJobTitle] = useState("");
@@ -55,7 +66,7 @@ function AppPageContent() {
   useEffect(() => {
     const hireAddress = searchParams?.get("hire");
     if (hireAddress) {
-      setActiveTab("client");
+      selectRole("client");
       setMilestones(prev => prev.map(m => ({ ...m, freelancerAddress: hireAddress })));
     }
   }, [searchParams]);
@@ -109,6 +120,17 @@ function AppPageContent() {
       const milestoneAmounts = milestones.map((m) =>
         ethers.parseEther(String(parseFloat(m.amountEth)))
       );
+
+      // Validate that all addresses are registered freelancers
+      const valRes = await fetch("/api/freelancers/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ addresses: freelancerAddresses }),
+      });
+      const valData = await valRes.json();
+      if (!valData.valid) {
+        throw new Error(`The following addresses are NOT registered freelancers on SafeLance: ${valData.unregistered.join(", ")}. Please ask them to create a profile first before you can hire them.`);
+      }
 
       // Use direct contract call (user signs directly — meta-tx for arrays needs custom encoding)
       const signer = await provider.getSigner();
@@ -170,6 +192,55 @@ function AppPageContent() {
     }
   }
 
+  if (role === null) {
+    return (
+      <div className="mx-auto max-w-5xl px-6 py-24 min-h-[85vh] flex flex-col items-center justify-center">
+        <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mb-4">Welcome to SafeLance</h1>
+          <p className="text-lg text-zinc-400 max-w-lg mx-auto leading-relaxed">
+            How are you looking to use the platform today? You can always switch this later.
+          </p>
+        </div>
+        
+        <div className="grid sm:grid-cols-2 gap-6 w-full max-w-3xl animate-in fade-in zoom-in-95 duration-700 delay-150 fill-mode-both">
+          {/* Client Card */}
+          <button 
+            onClick={() => selectRole("client")}
+            className="group relative rounded-3xl border border-white/10 bg-white/5 p-8 text-left transition-all duration-300 hover:bg-white/10 hover:border-violet-500/50 overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-32 bg-violet-500/10 blur-[80px] rounded-full pointer-events-none group-hover:bg-violet-500/20 transition-colors" />
+            <div className="relative z-10">
+              <div className="h-14 w-14 rounded-2xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <Briefcase className="h-6 w-6 text-violet-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-3">I want to hire</h2>
+              <p className="text-zinc-400 leading-relaxed max-w-[90%]">
+                Create Web3 jobs, assign milestones to verified talent, and fund escrow securely on-chain.
+              </p>
+            </div>
+          </button>
+
+          {/* Freelancer Card */}
+          <button 
+            onClick={() => selectRole("freelancer")}
+            className="group relative rounded-3xl border border-white/10 bg-white/5 p-8 text-left transition-all duration-300 hover:bg-white/10 hover:border-emerald-500/50 overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 p-32 bg-emerald-500/10 blur-[80px] rounded-full pointer-events-none group-hover:bg-emerald-500/20 transition-colors" />
+            <div className="relative z-10">
+              <div className="h-14 w-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <UserCircle className="h-6 w-6 text-emerald-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-3">I want to work</h2>
+              <p className="text-zinc-400 leading-relaxed max-w-[90%]">
+                Build your on-chain reputation, discover gigs, and get paid instantly in crypto.
+              </p>
+            </div>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       {/* Page header */}
@@ -180,37 +251,27 @@ function AppPageContent() {
           </p>
           <h1 className="text-3xl font-bold text-white tracking-tight">My Workspace</h1>
         </div>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-2.5 text-sm font-medium text-zinc-300 hover:text-white transition-all duration-200"
-        >
-          <LayoutDashboard className="h-4 w-4" />
-          View Dashboard
-        </Link>
-      </div>
-
-      {/* Tabs */}
-      <div className="mb-8 flex rounded-xl border border-white/10 bg-white/5 p-1.5 backdrop-blur max-w-sm">
-        {(["client", "freelancer"] as const).map((t) => (
+        <div className="flex items-center gap-3">
           <button
-            key={t}
-            onClick={() => setActiveTab(t)}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all duration-200 ${
-              activeTab === t
-                ? "bg-violet-600 text-white shadow-md shadow-violet-500/20"
-                : "text-zinc-400 hover:text-white hover:bg-white/5"
-            }`}
+            onClick={() => setRole(null)}
+            className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors bg-white/5 px-3 py-1.5 rounded-lg border border-white/10"
           >
-            {t === "client" ? <Briefcase className="h-4 w-4" /> : <UserCircle className="h-4 w-4" />}
-            {t === "client" ? "Hire a Freelancer" : "Become a Freelancer"}
+            Switch Role
           </button>
-        ))}
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-4 py-2.5 text-sm font-medium text-zinc-300 hover:text-white transition-all duration-200"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            View Dashboard
+          </Link>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-5 gap-8 items-start">
         {/* ── Main form ──────────────────────────────────────────────────── */}
         <div className="md:col-span-3">
-          {activeTab === "client" ? (
+          {role === "client" ? (
             <div className="rounded-2xl border border-white/8 bg-white/3 p-8 backdrop-blur">
               <h2 className="text-xl font-semibold text-white mb-1">Create a Job</h2>
               <p className="text-sm text-zinc-500 mb-7">
@@ -413,7 +474,7 @@ function AppPageContent() {
                         </>
                       ) : (
                         <>
-                          Deplopy &amp; Fund Jobs ({totalEth.toFixed(4)} ETH)
+                          Deploy & Fund Jobs ({totalEth.toFixed(4)} ETH)
                           <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1.5 transition-transform" />
                         </>
                       )}
@@ -436,9 +497,9 @@ function AppPageContent() {
         {/* ── Side panel ──────────────────────────────────────────────────── */}
         <div className="md:col-span-2 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-4">
-            {activeTab === "client" ? "How milestones work" : "Why join?"}
+            {role === "client" ? "How milestones work" : "Why join?"}
           </p>
-          {(activeTab === "client"
+          {(role === "client"
             ? [
                 { step: "01", title: "Create with milestones", body: "Define the scope and ETH amount per milestone in one transaction." },
                 { step: "02", title: "Fund each milestone", body: "Client sends exact ETH per milestone — locked in escrow, not releasable by anyone else." },

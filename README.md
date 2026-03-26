@@ -2,97 +2,184 @@
   <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield.svg" alt="SafeLance Shield" width="80" />
   <h1>SafeLance</h1>
   <p><strong>Work Without Trust Issues. Get Paid Securely.</strong></p>
-  <p>A Web3 freelance marketplace powering trustless engagements through smart contract escrow, milestone-based payouts, and gasless meta-transactions.</p>
+  <p>A Web3 freelance marketplace powering trustless engagements through smart contract escrow, milestone-based payouts, on-chain reputation, and an admin control panel.</p>
+
+  ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
+  ![Solidity](https://img.shields.io/badge/Solidity-0.8-blue?logo=ethereum)
+  ![Supabase](https://img.shields.io/badge/Supabase-green?logo=supabase)
+  ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 </div>
 
 ---
 
-## 🛑 The Trust Problem in Freelancing
-The global freelance economy is booming, yet both freelancers and clients suffer from severe trust deficits:
+## 🛑 The Problem
+
+The global freelance economy suffers from severe trust deficits:
 - **Clients** fear paying upfront for incomplete or subpar work.
 - **Freelancers** risk not getting paid after delivering their services.
-- **Middlemen** (traditional platforms) charge exorbitant fees (10-20%) just to mediate disputes and hold funds.
+- **Middlemen** charge 10–20% just to mediate disputes and hold funds.
 
 ## ✨ The SafeLance Solution
-SafeLance removes the need for blind trust and centralized middlemen by leveraging blockchain technology:
-- **Smart Contract Escrow:** Funds are locked securely on-chain when a job starts. They are only released when both parties agree the milestone is met.
-- **Gasless Meta-Transactions:** Utilizing relay networks, SafeLance subsidizes gas fees for seamless interactions. Users simply sign messages off-chain; the protocol handles the rest. This drastically lowers the barrier to entry for non-crypto natives.
-- **Milestone-Based Payments:** Break large projects into manageable chunks. Funds are committed and released progressively, keeping both sides aligned.
-- **Decentralized Reputation (Future):** Immutable work history tied to wallet addresses.
 
-## 🚀 Key Features
-1. **Multi-Milestone Jobs (`MilestoneEscrow.sol`):** Create complex, long-term engagements with dedicated funding and approval cycles.
-2. **Zero-Gas UX (`api/relay`):** Integrated Ethers.js relayers execute transactions on behalf of the user. No need to hold ETH to interact with the platform.
-3. **Intuitive Next.js Interface:** Premium consumer-style UI built with Tailwind CSS, abstracting away the complexity of Web3.
-4. **Instant Disputes & Refunds:** Handled deterministically by the smart contract rules.
+SafeLance removes blind trust and centralized middlemen using blockchain:
 
-## 🛠️ Technical Architecture
-SafeLance is built to be fast, scalable, and decentralized:
-- **Frontend / Client:** Next.js (App Router), React 18, TailwindCSS, Lucide Icons.
-- **Smart Contracts:** Solidity (Deployed on Ethereum Sepolia Testnet).
-- **Web3 Interaction:** Ethers.js (v6).
-- **Backend / Relayer:** Next.js API Routes (Serverless) handling meta-transactions and blockchain relaying.
-- **Database:** Supabase for fast, relational off-chain metadata (user profiles, job listings).
+| Feature | How it works |
+|---|---|
+| **Smart Contract Escrow** | Funds locked on-chain, released only on mutual approval |
+| **Milestone Payments** | Projects split into verifiable chunks with per-milestone funding |
+| **Gasless Meta-Transactions** | Users sign off-chain; the relay network pays gas fees |
+| **On-Chain Reputation** | `ReputationRegistry` contract records verified star ratings |
+| **Private Chat** | Real-time client ↔ freelancer messaging on job acceptance |
+| **Dispute System** | Evidence submission flow; admin resolves via smart contract call |
+| **Admin Dashboard** | Full control panel with platform stats, user management & dispute resolution |
 
 ---
 
-## 🏆 Grant Proposal Context & Impact
-SafeLance aligns with initiatives funding the **financialization of work, Web3 adoption, and real-world utility of smart contracts**. 
+## 🚀 Feature Overview
 
-**Why Fund SafeLance?**
-- **Real-World Utility:** Solves a multi-billion dollar friction point (freelance payment disputes) using blockchain primitives.
-- **Mass Adoption UX:** The gasless relayer design proves that Web3 applications can have Web2-level UX.
-- **Open Source Infrastructure:** The `MilestoneEscrow` smart contracts serve as a public good for other gig economy protocols.
-- **Scalability:** Built on Next.js, ready to be scaled to Layer 2s (Optimism, Arbitrum, Base) for even lower execution costs.
+### For Clients
+- Post jobs with multiple milestones and funding amounts
+- Accept/reject freelancer applications
+- Approve milestone deliverables and release escrow funds
+- Rate freelancers on-chain after completion
+- Open disputes with evidence upload
 
-Funds from the grant will be directly utilized to:
-1. Audit the `MilestoneEscrow.sol` smart contracts.
-2. Deploy the protocol to production on a low-code Layer 2 Rollup.
-3. Expand the decentralized dispute resolution mechanism (e.g., Kleros integration).
-4. Subsidize the gas relayer for the first 10,000 users.
+### For Freelancers
+- Register a profile (name, skills, portfolio, hourly rate, GitHub)
+- Browse job listings and apply
+- Submit deliverable URLs per milestone
+- Private chat with the client after acceptance
+- View on-chain reputation score and badge
+
+### Admin Panel (`/auth` → admin credentials)
+- **Stats Dashboard** — freelancers, clients, jobs, milestones, open/resolved disputes, reviews
+- **Jobs Table** — full list with chain IDs and wallet addresses
+- **Freelancers Table** — registered profiles with contact and wallet info
+- **Disputes Table** — status badges, evidence links, resolve action
+- Separate session (`sessionStorage`), no Supabase auth required
+
+---
+
+## 🛠️ Technical Architecture
+
+```
+SafeLance/
+├── src/
+│   ├── app/
+│   │   ├── (marketing)/        # Landing page
+│   │   ├── (main)/             # Authenticated app shell (AppNavbar)
+│   │   │   ├── app/            # User home / job feed
+│   │   │   ├── dashboard/      # Client & freelancer dashboard
+│   │   │   ├── jobs/[jobId]/   # Job detail, milestones, chat
+│   │   │   ├── freelancers/    # Freelancer directory
+│   │   │   └── admin/          # Admin disputes (existing)
+│   │   ├── admin/              # Standalone admin section (no navbar)
+│   │   │   ├── page.tsx        # Admin login (also accessible via /auth)
+│   │   │   └── dashboard/      # Admin control panel
+│   │   ├── auth/               # User auth + admin shortcut
+│   │   └── api/                # API routes
+│   │       ├── admin/stats/    # Aggregated platform stats
+│   │       ├── relay/          # Gasless meta-transaction relayer
+│   │       ├── jobs/           # Job CRUD
+│   │       ├── freelancers/    # Freelancer profile API
+│   │       ├── disputes/       # Dispute lifecycle
+│   │       ├── messages/       # Private chat
+│   │       ├── ratings/        # On-chain rating mirror
+│   │       └── notifications/  # Notification badges
+│   ├── components/             # Shared UI components
+│   └── lib/                    # Supabase client, contract ABI, relay
+├── contracts/
+│   ├── MilestoneEscrow.sol     # Core escrow contract
+│   └── ReputationRegistry.sol  # On-chain star ratings
+└── supabase_setup.sql          # Full DB schema
+```
+
+**Stack:**
+- **Frontend:** Next.js 15 (App Router), React 18, Tailwind CSS, Lucide Icons
+- **Smart Contracts:** Solidity 0.8 on Ethereum Sepolia Testnet
+- **Web3:** Ethers.js v6, MetaMask wallet auth
+- **Database:** Supabase (PostgreSQL) — off-chain metadata
+- **Relayer:** Next.js serverless API routes (gasless UX)
 
 ---
 
 ## 💻 Getting Started
 
 ### Prerequisites
-- Node.js (v20+)
-- MetaMask (or any Web3 Wallet) configured for the Sepolia Testnet
-- Supabase Project (for backend metadata)
+- Node.js v20+
+- MetaMask configured for **Sepolia Testnet**
+- A [Supabase](https://supabase.com) project
 
 ### Installation
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-username/safelance.git
-   cd safelance
-   ```
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+```bash
+# 1. Clone
+git clone https://github.com/your-username/safelance.git
+cd safelance
 
-3. **Environment Setup:**
-   Create a `.env.local` file and add the required keys:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   NEXT_PUBLIC_CONTRACT_ADDRESS=deployed_sepolia_contract_address
-   RELAYER_PRIVATE_KEY=your_relayer_wallet_private_key
-   RPC_URL=your_sepolia_rpc_url
-   ```
+# 2. Install
+npm install
 
-4. **Run the Development Server:**
-   ```bash
-   npm run dev
-   ```
-   Navigate to `http://localhost:3000` to view the application.
+# 3. Environment — create .env.local
+cp .env.example .env.local   # then fill in values
+```
+
+### Environment Variables
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (admin stats API) |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Deployed `MilestoneEscrow` address |
+| `NEXT_PUBLIC_REPUTATION_ADDRESS` | Deployed `ReputationRegistry` address |
+| `RELAYER_PRIVATE_KEY` | Relayer wallet private key |
+| `RPC_URL` | Sepolia RPC endpoint (e.g. Alchemy/Infura) |
+
+### Database Setup
+
+Run [`supabase_setup.sql`](./supabase_setup.sql) in your Supabase SQL editor to create all tables (`freelancers`, `jobs_meta`, `milestones`, `ratings`, `disputes`).
+
+### Run
+
+```bash
+npm run dev
+# → http://localhost:3000
+```
+
+### Admin Access
+
+Navigate to `/auth` and log in with:
+```
+Email:    admin@admin.com
+Password: teja1432teja@2005
+```
+This bypasses Supabase auth and redirects to `/admin/dashboard`.
+
+---
+
+## 🏆 Grant Context
+
+SafeLance demonstrates **real-world utility of smart contracts** for the gig economy:
+- Solves multi-billion dollar freelance payment friction
+- Gasless UX proves Web3 can match Web2 accessibility
+- `MilestoneEscrow` and `ReputationRegistry` are public-good primitives
+- Ready to deploy on L2s (Optimism, Arbitrum, Base)
+
+**Grant fund usage:**
+1. Smart contract security audit
+2. Mainnet / L2 deployment
+3. Kleros integration for decentralized dispute resolution
+4. Gas relayer subsidy for first 10,000 users
 
 ---
 
 ## 📄 License
-SafeLance is open-sourced software licensed under the **MIT License**.
+
+MIT — see [LICENSE](./LICENSE)
 
 <div align="center">
   <p>Built with ❤️ for a fairer future of work.</p>
 </div>
+
+

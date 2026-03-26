@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +21,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
+    // Fetch current status
+    const { data: currentJob } = await supabase
+      .from("jobs_meta")
+      .select("freelancer_status")
+      .eq("chain_job_id", String(chainJobId))
+      .single();
+
+    let statuses: Record<string, string> = {};
+    if (currentJob?.freelancer_status) {
+      if (currentJob.freelancer_status.startsWith("{")) {
+        try { statuses = JSON.parse(currentJob.freelancer_status); } catch (e) {}
+      } else {
+        // Legacy single string, wipe it or migrate it
+      }
+    }
+
+    statuses[freelancerAddress.toLowerCase()] = status;
+
     // Update the jobs_meta table
     const { data, error } = await supabase
       .from("jobs_meta")
-      .update({ freelancer_status: status })
+      .update({ freelancer_status: JSON.stringify(statuses) })
       .eq("chain_job_id", String(chainJobId))
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Supabase update error:", error);

@@ -15,10 +15,10 @@ interface Message {
 interface ChatBoxProps {
   jobId: number;
   clientAddress: string;
-  freelancerAddress: string;
+  freelancerAddresses: string[];
 }
 
-export default function ChatBox({ jobId, clientAddress, freelancerAddress }: ChatBoxProps) {
+export default function ChatBox({ jobId, clientAddress, freelancerAddresses }: ChatBoxProps) {
   const { account } = useWallet();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -27,7 +27,9 @@ export default function ChatBox({ jobId, clientAddress, freelancerAddress }: Cha
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const isClient = account?.toLowerCase() === clientAddress.toLowerCase();
-  const isFreelancer = account?.toLowerCase() === freelancerAddress.toLowerCase();
+  const isFreelancer = account 
+    ? freelancerAddresses.some(addr => addr.toLowerCase() === account.toLowerCase())
+    : false;
   const canChat = isClient || isFreelancer;
 
   const fetchMessages = async () => {
@@ -122,7 +124,7 @@ export default function ChatBox({ jobId, clientAddress, freelancerAddress }: Cha
           </div>
         ) : (
           messages.map((msg) => {
-            const isMe = account.toLowerCase() === msg.sender_address.toLowerCase();
+            const isMe = account?.toLowerCase() === msg.sender_address.toLowerCase();
             const senderRole = msg.sender_address.toLowerCase() === clientAddress.toLowerCase() ? "Client" : "Freelancer";
 
             return (

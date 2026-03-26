@@ -104,6 +104,16 @@ export default function AuthPage() {
         setForm((f) => ({ ...f, password: "", confirmPassword: "" }));
       }
     } else {
+      // ── Admin shortcut ────────────────────────────────────────────────────
+      if (
+        form.email === "admin@admin.com" &&
+        form.password === "teja1432teja@2005"
+      ) {
+        sessionStorage.setItem("admin_session", "true");
+        router.push("/admin/dashboard");
+        return;
+      }
+
       // Login
       const { error } = await supabase.auth.signInWithPassword({
         email: form.email,
