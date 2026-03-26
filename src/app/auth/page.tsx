@@ -104,18 +104,10 @@ export default function AuthPage() {
         setForm((f) => ({ ...f, password: "", confirmPassword: "" }));
       }
     } else {
-      // ── Admin shortcut ────────────────────────────────────────────────────
-      if (
-        form.email === "admin@admin.com" &&
-        form.password === "teja1432teja@2005"
-      ) {
-        sessionStorage.setItem("admin_session", "true");
-        router.push("/admin/dashboard");
-        return;
-      }
+
 
       // Login
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: form.email,
         password: form.password,
       });
@@ -126,8 +118,20 @@ export default function AuthPage() {
             ? "Please confirm your email before logging in. Check your inbox."
             : error.message;
         setStatus({ type: "error", message: msg });
-      } else {
-        router.push("/app");
+      } else if (authData.user) {
+        // Check if admin
+        const { data: roleData } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("identifier", authData.user.email)
+          .single();
+
+        if (roleData?.role === "admin") {
+          sessionStorage.setItem("admin_session", "true");
+          router.push("/admin/dashboard");
+        } else {
+          router.push("/app");
+        }
       }
     }
 

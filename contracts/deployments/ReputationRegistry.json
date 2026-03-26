@@ -1,7 +1,7 @@
 {
-  "address": "0xbAB6FaaC4Ae02Ca3B5e25f3F4b6689Fe60560BC5",
-  "trustedEscrow": "0xf07d489007d7dFb829Aa87F1aC0aFd14d4cdAb52",
+  "address": "0xF6D298E37F25c5DEEA203Cc4af1bB6a5dfB2BA43",
+  "trustedEscrow": "0xC3a19B96b783199aBBCA51225Cd65F56E9C571DA",
   "network": "sepolia",
   "chainId": 11155111,
-  "deployedAt": "2026-03-26T03:24:25.832Z"
+  "deployedAt": "2026-03-26T06:50:37.508Z"
 }

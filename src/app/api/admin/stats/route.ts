@@ -1,15 +1,37 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export async function GET() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  // Use service role key if available for broader access, otherwise fall back to anon
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    "";
+export const dynamic = "force-dynamic";
 
+export async function GET(req: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  
+  // Create an auth client to verify the user token
+  const authClient = createClient(supabaseUrl, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "");
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  
+  const token = authHeader.replace("Bearer ", "");
+  const { data: { user }, error: userError } = await authClient.auth.getUser(token);
+  
+  if (userError || !user) {
+    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  }
+
+  // Use service role key for actual database queries
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
   const supabase = createClient(supabaseUrl, supabaseKey);
+
+  // Check user role
+  const { data: roleData, error: roleError } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('identifier', user.email)
+    .single();
+
+  if (roleError || roleData?.role !== 'admin') {
+    return NextResponse.json({ error: "Access denied. Action requires administrator privileges." }, { status: 403 });
+  }
 
   // ── Freelancers count ─────────────────────────────────────────────────────
   const { count: freelancerCount } = await supabase
@@ -37,7 +59,7 @@ export async function GET() {
   // ── Disputes by status ────────────────────────────────────────────────────
   const { data: disputeData } = await supabase
     .from("disputes")
-    .select("id, status, chain_job_id, milestone_index, client_address, freelancer_address, created_at");
+    .select("id, status, chain_job_id, milestone_index, client_address, freelancer_address, created_at, updated_at, client_evidence, freelancer_evidence");
 
   const allDisputes = disputeData ?? [];
   const openDisputes = allDisputes.filter((d: { status: string }) =>

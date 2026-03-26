@@ -7,6 +7,7 @@ import {
   Star, LogOut, RefreshCw, Shield, TrendingUp, Clock,
   ChevronRight, XCircle, Activity, Layers
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Types
@@ -48,6 +49,9 @@ interface Dispute {
   freelancer_address: string;
   status: string;
   created_at: string;
+  updated_at?: string;
+  client_evidence?: string;
+  freelancer_evidence?: string;
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -153,7 +157,14 @@ export default function AdminDashboard() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/stats", { cache: "no-store" });
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/admin/stats", { 
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${session?.access_token || ""}`
+        }
+      });
+      if (!res.ok) throw new Error("Failed to load");
       const data = await res.json();
       setStats(data.stats);
       setJobs(data.recentJobs);
@@ -171,7 +182,9 @@ export default function AdminDashboard() {
 
   function logout() {
     sessionStorage.removeItem("admin_session");
-    router.push("/admin");
+    supabase.auth.signOut().then(() => {
+      router.push("/admin");
+    });
   }
 
   // ── Skeleton placeholder ──────────────────────────────────────────────────
@@ -417,12 +430,13 @@ export default function AdminDashboard() {
                     <div key={d.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-white/2 px-4 py-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-white">Job #{d.chain_job_id} · Milestone {d.milestone_index}</p>
-                        <p className="text-xs text-zinc-600">{short(d.client_address)} vs {short(d.freelancer_address)}</p>
+                        <p className="text-xs text-zinc-600">Updated: {fmt(d.updated_at || d.created_at)}</p>
                       </div>
-                      <span className={`text-[10px] font-semibold border rounded-full px-2.5 py-1 uppercase tracking-wider ${statusColor(d.status)}`}>
-                        {statusLabel(d.status)}
-                      </span>
-                      <span className="text-xs text-zinc-600">{fmt(d.created_at)}</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={`text-[10px] font-semibold border rounded-full px-2.5 py-1 uppercase tracking-wider ${statusColor(d.status)}`}>
+                          {statusLabel(d.status)}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -536,7 +550,7 @@ export default function AdminDashboard() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/6">
-                      {["Job ID", "Milestone", "Client", "Freelancer", "Status", "Date", "Action"].map((h) => (
+                      {["Job ID", "Milestone", "Client", "Freelancer", "Status", "Evidence Log", "Date", "Action"].map((h) => (
                         <th key={h} className="text-left px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
@@ -553,7 +567,18 @@ export default function AdminDashboard() {
                             {statusLabel(d.status)}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-zinc-500 text-xs">{fmt(d.created_at)}</td>
+                        <td className="px-5 py-3">
+                          <div className="flex flex-col gap-0.5 text-[10px] text-zinc-500 font-medium">
+                            <span>Client: {d.client_evidence ? "✅ Submitted" : "⏳ Pending"}</span>
+                            <span>Freelancer: {d.freelancer_evidence ? "✅ Submitted" : "⏳ Pending"}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-zinc-500 text-xs">
+                          <div className="flex flex-col">
+                            <span>Opened: {fmt(d.created_at)}</span>
+                            <span className="text-[10px]">Updated: {fmt(d.updated_at || d.created_at)}</span>
+                          </div>
+                        </td>
                         <td className="px-5 py-3">
                           {d.status.startsWith("resolved") ? (
                             <span className="flex items-center gap-1 text-xs text-emerald-500">

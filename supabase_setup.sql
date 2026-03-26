@@ -116,3 +116,16 @@ CREATE INDEX IF NOT EXISTS idx_disputes_client      ON disputes(client_address);
 CREATE INDEX IF NOT EXISTS idx_disputes_freelancer  ON disputes(freelancer_address);
 CREATE INDEX IF NOT EXISTS idx_disputes_job         ON disputes(chain_job_id);
 
+-- ─── User Roles (Admin / Client / Freelancer) ─────────────────────────────────
+-- Maps an email or wallet address to a specific platform role.
+-- Crucial for Admin Dashboard authorization.
+CREATE TABLE IF NOT EXISTS user_roles (
+    identifier TEXT PRIMARY KEY,    -- email address or wallet address
+    role TEXT NOT NULL DEFAULT 'user', -- 'admin', 'freelancer', 'client'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Seed the initial admin account
+INSERT INTO user_roles (identifier, role) 
+VALUES ('admin@safelance.io', 'admin') -- CHANGED FROM HARDCODED! Create this user in Supabase Auth as well.
+ON CONFLICT (identifier) DO NOTHING;

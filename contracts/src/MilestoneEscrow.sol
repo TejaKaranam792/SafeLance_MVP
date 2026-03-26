@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 // Minimal interface to avoid circular imports
 interface IReputationRegistry {
@@ -23,7 +24,7 @@ interface IReputationRegistry {
  *         All actions support meta-transactions so users never pay gas.
  *         Integrates with ReputationRegistry to record on-chain ratings.
  */
-contract MilestoneEscrow is ReentrancyGuard {
+contract MilestoneEscrow is ReentrancyGuard, Pausable {
     using ECDSA for bytes32;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -61,6 +62,8 @@ contract MilestoneEscrow is ReentrancyGuard {
     // State
     // ─────────────────────────────────────────────────────────────────────────
 
+    uint256 public constant MAX_MILESTONE_AMOUNT = 0.5 ether; // Limit for beta phase
+    
     uint256 public jobCount;
 
     /// @notice Optional reputation registry — set to address(0) to disable.
@@ -88,6 +91,27 @@ contract MilestoneEscrow is ReentrancyGuard {
     modifier onlyAdmin() {
         require(msg.sender == admin, "ME: not admin");
         _;
+    }
+
+    modifier onlyClient(uint256 jobId) {
+        require(jobs[jobId].client != address(0), "ME: job not found");
+        require(_msgSender() == jobs[jobId].client, "ME: not the client");
+        _;
+    }
+
+    modifier onlyFreelancer(uint256 jobId, uint8 milestoneIndex) {
+        require(jobs[jobId].client != address(0), "ME: job not found");
+        require(milestoneIndex < jobs[jobId].milestoneCount, "ME: bad index");
+        require(_msgSender() == milestones[jobId][milestoneIndex].freelancer, "ME: not the assigned freelancer");
+        _;
+    }
+
+    function pause() external onlyAdmin {
+        _pause();
+    }
+
+    function unpause() external onlyAdmin {
+        _unpause();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -157,7 +181,7 @@ contract MilestoneEscrow is ReentrancyGuard {
 
     address private _metaTxSender;
 
-    function _msgSender() internal view returns (address) {
+    function _msgSender() internal view override returns (address) {
         if (msg.sender == address(this) && _metaTxSender != address(0)) {
             return _metaTxSender;
         }
@@ -172,7 +196,7 @@ contract MilestoneEscrow is ReentrancyGuard {
         address from,
         bytes calldata functionData,
         bytes calldata signature
-    ) external nonReentrant returns (bytes memory) {
+    ) external nonReentrant whenNotPaused returns (bytes memory) {
         require(from != address(0), "ME: zero address");
 
         bytes32 metaTxHash = keccak256(
@@ -219,7 +243,7 @@ contract MilestoneEscrow is ReentrancyGuard {
         string[] calldata milestoneTitles,
         uint256[] calldata milestoneAmounts,
         address[] calldata freelancerAddresses
-    ) external returns (uint256 jobId) {
+    ) external whenNotPaused returns (uint256 jobId) {
         address client = _msgSender();
 
         require(bytes(title).length > 0,   "ME: empty title");
@@ -241,6 +265,7 @@ contract MilestoneEscrow is ReentrancyGuard {
 
         for (uint8 i = 0; i < uint8(milestoneTitles.length); i++) {
             require(milestoneAmounts[i] > 0, "ME: ms amount must be > 0");
+            require(milestoneAmounts[i] <= MAX_MILESTONE_AMOUNT, "ME: ms amount exceeds beta limit");
             require(freelancerAddresses[i] != address(0), "ME: zero freelancer");
             require(freelancerAddresses[i] != client, "ME: client == freelancer");
 
@@ -263,14 +288,11 @@ contract MilestoneEscrow is ReentrancyGuard {
     // ─────────────────────────────────────────────────────────────────────────
 
     function fundMilestone(uint256 jobId, uint8 milestoneIndex)
-        external payable nonReentrant
+        external payable nonReentrant whenNotPaused onlyClient(jobId)
     {
-        address sender = _msgSender();
         Job storage job = jobs[jobId];
         Milestone storage ms = milestones[jobId][milestoneIndex];
 
-        require(job.client != address(0),          "ME: job not found");
-        require(sender == job.client,              "ME: not the client");
         require(milestoneIndex < job.milestoneCount, "ME: bad index");
         require(ms.status == MilestoneStatus.Pending, "ME: not pending");
         require(msg.value == ms.amount,            "ME: wrong ETH amount");
@@ -283,15 +305,10 @@ contract MilestoneEscrow is ReentrancyGuard {
     }
 
     function submitMilestone(uint256 jobId, uint8 milestoneIndex)
-        external nonReentrant
+        external nonReentrant whenNotPaused onlyFreelancer(jobId, milestoneIndex)
     {
-        address sender = _msgSender();
-        Job storage job = jobs[jobId];
         Milestone storage ms = milestones[jobId][milestoneIndex];
 
-        require(job.client != address(0),            "ME: job not found");
-        require(sender == ms.freelancer,              "ME: not the assigned freelancer");
-        require(milestoneIndex < job.milestoneCount,  "ME: bad index");
         require(ms.status == MilestoneStatus.Funded,  "ME: not funded");
 
         ms.status = MilestoneStatus.Submitted;
@@ -307,14 +324,11 @@ contract MilestoneEscrow is ReentrancyGuard {
      *                         Pass 0 to skip reputation recording.
      */
     function approveMilestone(uint256 jobId, uint8 milestoneIndex, uint8 stars)
-        external nonReentrant
+        external nonReentrant whenNotPaused onlyClient(jobId)
     {
-        address sender = _msgSender();
         Job storage job = jobs[jobId];
         Milestone storage ms = milestones[jobId][milestoneIndex];
 
-        require(job.client != address(0),              "ME: job not found");
-        require(sender == job.client,                  "ME: not the client");
         require(milestoneIndex < job.milestoneCount,   "ME: bad index");
         require(
             ms.status == MilestoneStatus.Funded ||
@@ -339,20 +353,17 @@ contract MilestoneEscrow is ReentrancyGuard {
 
         // Record on-chain reputation (non-reverting — don't block payment on reputation failure)
         if (stars > 0 && address(reputationRegistry) != address(0)) {
-            try reputationRegistry.recordRating(freelancer, sender, amount, stars) {}
+            try reputationRegistry.recordRating(freelancer, job.client, amount, stars) {}
             catch {}
         }
     }
 
     function disputeMilestone(uint256 jobId, uint8 milestoneIndex)
-        external nonReentrant
+        external nonReentrant whenNotPaused onlyClient(jobId)
     {
-        address sender = _msgSender();
         Job storage job = jobs[jobId];
         Milestone storage ms = milestones[jobId][milestoneIndex];
 
-        require(job.client != address(0),             "ME: job not found");
-        require(sender == job.client,                 "ME: not the client");
         require(milestoneIndex < job.milestoneCount,  "ME: bad index");
         require(
             ms.status == MilestoneStatus.Funded ||
@@ -366,14 +377,11 @@ contract MilestoneEscrow is ReentrancyGuard {
     }
 
     function refundMilestone(uint256 jobId, uint8 milestoneIndex)
-        external nonReentrant
+        external nonReentrant whenNotPaused onlyClient(jobId)
     {
-        address sender = _msgSender();
         Job storage job = jobs[jobId];
         Milestone storage ms = milestones[jobId][milestoneIndex];
 
-        require(job.client != address(0),            "ME: job not found");
-        require(sender == job.client,                "ME: not the client");
         require(milestoneIndex < job.milestoneCount, "ME: bad index");
         // Disputed milestones can ONLY be resolved by admin — no self-refund bypass
         require(
@@ -389,10 +397,10 @@ contract MilestoneEscrow is ReentrancyGuard {
         ms.amount      = 0;
         job.totalFunded -= amount;
 
-        (bool sent, ) = payable(sender).call{value: amount}("");
+        (bool sent, ) = payable(job.client).call{value: amount}("");
         require(sent, "ME: ETH transfer failed");
 
-        emit MilestoneRefunded(jobId, milestoneIndex, sender, amount);
+        emit MilestoneRefunded(jobId, milestoneIndex, job.client, amount);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, Mail, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
 
-const ADMIN_EMAIL = "admin@admin.com";
-const ADMIN_PASS = "teja1432teja@2005";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -26,15 +25,35 @@ export default function AdminLoginPage() {
     setError("");
     setLoading(true);
 
-    // Simulate slight delay for UX
-    await new Promise((r) => setTimeout(r, 600));
+    // Authenticate via Supabase
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (email === ADMIN_EMAIL && password === ADMIN_PASS) {
-      sessionStorage.setItem("admin_session", "true");
-      router.push("/admin/dashboard");
-    } else {
-      setError("Invalid admin credentials. Please try again.");
+    if (authError || !authData.user) {
+      setError(authError?.message || "Invalid admin credentials.");
+      setLoading(false);
+      return;
     }
+
+    // Check user_roles table for admin role
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('identifier', authData.user.email)
+      .single();
+
+    if (roleError || roleData?.role !== 'admin') {
+      await supabase.auth.signOut();
+      setError("Access denied. Administrator role required.");
+      setLoading(false);
+      return;
+    }
+
+    // Set legacy fallback flag and redirect
+    sessionStorage.setItem("admin_session", "true");
+    router.push("/admin/dashboard");
     setLoading(false);
   }
 

@@ -83,43 +83,50 @@ export default function JobDetailPage({ params }: { params: { jobId: string } })
       setMilestones(msData);
 
       // Fetch milestone from Supabase
-      const msRes = await fetch(`/api/milestones?jobId=${numJobId}`);
-
-      if (msRes.ok) {
-        const meta: Array<{ milestone_index: number; description?: string; deliverable_url?: string }> = await msRes.json();
-        const metaMap: Record<number, { description?: string; deliverableUrl?: string }> = {};
-        meta.forEach((m) => {
-          metaMap[m.milestone_index] = {
-            description: m.description,
-            deliverableUrl: m.deliverable_url,
-          };
-        });
-        setMetaMilestones(metaMap);
+      try {
+        const msRes = await fetch(`/api/milestones?jobId=${numJobId}`);
+        if (msRes.ok) {
+          const meta: Array<{ milestone_index: number; description?: string; deliverable_url?: string }> = await msRes.json();
+          const metaMap: Record<number, { description?: string; deliverableUrl?: string }> = {};
+          meta.forEach((m) => {
+            metaMap[m.milestone_index] = {
+              description: m.description,
+              deliverableUrl: m.deliverable_url,
+            };
+          });
+          setMetaMilestones(metaMap);
+        }
+      } catch (e) {
+        console.warn("Supabase (milestones) is down or unreachable. Falling back to on-chain UI mode.", e);
       }
 
       // Fetch job metadata with cache busting
-      const metaRes2 = await fetch(`/api/jobs/meta?jobId=${numJobId}&_t=${Date.now()}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" }
-      });
-      if (metaRes2.ok) {
-        const jobMeta = await metaRes2.json();
-        if (jobMeta && jobMeta.freelancer_status) {
-          if (jobMeta.freelancer_status.startsWith("{")) {
-            try {
-              setFreelancerStatuses(JSON.parse(jobMeta.freelancer_status));
-            } catch (e) {
-              console.error("Failed to parse freelancer_status JSON", e);
+      try {
+        const metaRes2 = await fetch(`/api/jobs/meta?jobId=${numJobId}&_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" }
+        });
+        if (metaRes2.ok) {
+          const jobMeta = await metaRes2.json();
+          if (jobMeta && jobMeta.freelancer_status) {
+            if (jobMeta.freelancer_status.startsWith("{")) {
+              try {
+                setFreelancerStatuses(JSON.parse(jobMeta.freelancer_status));
+              } catch (e) {
+                console.error("Failed to parse freelancer_status JSON", e);
+              }
+            } else {
+              // Fallback for legacy global string
+              const legacyObj: Record<string, string> = {};
+              uniqueFreelancers.forEach(f => {
+                legacyObj[f.toLowerCase()] = jobMeta.freelancer_status;
+              });
+              setFreelancerStatuses(legacyObj);
             }
-          } else {
-            // Fallback for legacy global string
-            const legacyObj: Record<string, string> = {};
-            uniqueFreelancers.forEach(f => {
-              legacyObj[f.toLowerCase()] = jobMeta.freelancer_status;
-            });
-            setFreelancerStatuses(legacyObj);
           }
         }
+      } catch (e) {
+        console.warn("Supabase (jobs/meta) is down or unreachable. Continuing with fallback data.", e);
       }
 
       setError(null);

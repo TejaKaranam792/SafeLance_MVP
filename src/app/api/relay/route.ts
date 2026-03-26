@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract";
 
+// Simple in-memory rate limiters (Memory resets on cold starts in serverless, but adds basic MVP friction)
+const walletTxCount = new Map<string, number>();
+const IP_RATE_LIMIT = new Map<string, { count: number; resetAt: number }>();
+const MAX_FREE_TX = 5;
+const MAX_IP_TX_PER_HOUR = 20;
+
 /**
  * POST /api/relay
  *
@@ -42,6 +48,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── Friction / Rate Limiting ──────────────────────────────────────────
+    const ip = req.headers.get("x-forwarded-for") || "unknown_ip";
+    
+    // IP Block Check
+    const ipData = IP_RATE_LIMIT.get(ip) || { count: 0, resetAt: Date.now() + 3600 * 1000 };
+    if (Date.now() > ipData.resetAt) {
+      ipData.count = 0;
+      ipData.resetAt = Date.now() + 3600 * 1000;
+    }
+    if (ipData.count >= MAX_IP_TX_PER_HOUR) {
+      return NextResponse.json({ error: "IP rate limit exceeded. Try again later." }, { status: 429 });
+    }
+
+    // Wallet Quota Check
+    const normalizedWallet = userAddress.toLowerCase();
+    const currentTxCount = walletTxCount.get(normalizedWallet) || 0;
+    if (currentTxCount >= MAX_FREE_TX) {
+      return NextResponse.json(
+        { error: "Free gasless transaction quota exceeded (max 5 per wallet). Please pay your own gas." }, 
+        { status: 429 }
+      );
+    }
+
     // ── Relayer wallet (server-side only) ─────────────────────────────────
     const relayerKey = process.env.RELAYER_PRIVATE_KEY;
     if (!relayerKey) {
@@ -76,6 +105,11 @@ export async function POST(req: NextRequest) {
     );
 
     const receipt = await tx.wait();
+
+    // ── Update Counters ───────────────────────────────────────────────────
+    ipData.count += 1;
+    IP_RATE_LIMIT.set(ip, ipData);
+    walletTxCount.set(normalizedWallet, currentTxCount + 1);
 
     return NextResponse.json({
       txHash: receipt.hash,

@@ -166,6 +166,19 @@ export default function MilestoneCard({ jobId, milestone, isClient, clientAddres
     return new ethers.Contract(MILESTONE_CONTRACT_ADDRESS, MILESTONE_ABI, signer);
   }
 
+  async function verifyMilestoneState(expectedStatusLabels: string[]) {
+    setLoading("verifying");
+    const contract = await getMilestoneContract();
+    // getMilestone returns [freelancer, title, amount, status, fundedAt, releasedAt]
+    const currentData = await contract.getMilestone(jobId, milestone.index);
+    const onChainStatus = Number(currentData[3]);
+    const currentLabel = MILESTONE_STATUS[onChainStatus as MilestoneStatusKey] as string;
+    
+    if (!expectedStatusLabels.includes(currentLabel)) {
+      throw new Error(`State mismatch: Milestone is already '${currentLabel}' on-chain. Please refresh.`);
+    }
+  }
+
   async function handleAction(actionName: string, action: () => Promise<ethers.ContractTransactionResponse>) {
     setLoading(actionName);
     setError(null);
@@ -183,6 +196,13 @@ export default function MilestoneCard({ jobId, milestone, isClient, clientAddres
   }
 
   async function fundMilestone() {
+    try {
+      await verifyMilestoneState(["Pending"]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "State mismatch");
+      setLoading(null);
+      return;
+    }
     await handleAction("fund", async () => {
       const contract = await getMilestoneContract();
       return contract.fundMilestone(jobId, milestone.index, { value: milestone.amount });
@@ -190,6 +210,13 @@ export default function MilestoneCard({ jobId, milestone, isClient, clientAddres
   }
 
   async function submitMilestone() {
+    try {
+      await verifyMilestoneState(["Funded"]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "State mismatch");
+      setLoading(null);
+      return;
+    }
     // Save deliverable URL to Supabase
     if (deliverableInput) {
       await fetch("/api/milestones", {
@@ -215,6 +242,13 @@ export default function MilestoneCard({ jobId, milestone, isClient, clientAddres
 
   async function handleApproveConfirmed(stars: number, comment: string) {
     setShowRating(false);
+    try {
+      await verifyMilestoneState(["Funded", "Submitted"]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "State mismatch");
+      setLoading(null);
+      return;
+    }
     await handleAction("approve", async () => {
       const contract = await getMilestoneContract();
       return contract.approveMilestone(jobId, milestone.index, stars);
@@ -241,6 +275,13 @@ export default function MilestoneCard({ jobId, milestone, isClient, clientAddres
   }
 
   async function disputeMilestone() {
+    try {
+      await verifyMilestoneState(["Funded", "Submitted"]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "State mismatch");
+      setLoading(null);
+      return;
+    }
     await handleAction("dispute", async () => {
       const contract = await getMilestoneContract();
       return contract.disputeMilestone(jobId, milestone.index);
@@ -264,6 +305,13 @@ export default function MilestoneCard({ jobId, milestone, isClient, clientAddres
   }
 
   async function refundMilestone() {
+    try {
+      await verifyMilestoneState(["Funded"]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "State mismatch");
+      setLoading(null);
+      return;
+    }
     await handleAction("refund", async () => {
       const contract = await getMilestoneContract();
       return contract.refundMilestone(jobId, milestone.index);
