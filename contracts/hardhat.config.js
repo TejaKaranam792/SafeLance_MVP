@@ -1,5 +1,8 @@
+require("ts-node/register/transpile-only");
 require("@nomicfoundation/hardhat-ethers");
 require("@nomicfoundation/hardhat-chai-matchers");
+require("@nomicfoundation/hardhat-verify");
+require("@openzeppelin/hardhat-upgrades");
 require("dotenv").config({ path: require("path").resolve(__dirname, "../.env.local") });
 
 const DEPLOYER_PRIVATE_KEY = process.env.RELAYER_PRIVATE_KEY || "";
@@ -38,5 +41,8 @@ module.exports = {
     tests: "./test",
     cache: "./cache",
     artifacts: "./artifacts",
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY || "",
   },
 };

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useWallet } from '@/components/WalletContext';
+import { UserCircle, Loader2 } from 'lucide-react';
 
 export default function FreelancerRegistration() {
   const { account, connectWallet } = useWallet();
@@ -121,124 +122,115 @@ export default function FreelancerRegistration() {
   }
 
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/3 p-8 backdrop-blur">
-      <h2 className="text-lg font-semibold text-white mb-1">Create Your Profile</h2>
-      <p className="text-sm text-zinc-500 mb-6">
-        Register as a freelancer to get hired and paid directly on-chain.
-      </p>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Name + Email */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Full Name</label>
-            <input type="text" required placeholder="Satoshi Nakamoto" value={form.fullName} onChange={f('fullName')} className={inputCls} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Email Address</label>
-            <input type="email" required placeholder="satoshi@bitcoin.org" value={form.email} onChange={f('email')} className={inputCls} />
-          </div>
+    <div className="rounded-[32px] border border-white/10 bg-white/5 p-10 backdrop-blur-xl relative overflow-hidden">
+      {/* Ambient glow */}
+      <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-violet-600/10 blur-[60px]" />
+      
+      <div className="relative z-10">
+        <div className="mb-8">
+          <h2 className="text-2xl font-black text-white mb-2 tracking-tight flex items-center gap-3">
+            <UserCircle className="h-6 w-6 text-violet-400" />
+            Complete Your Profile
+          </h2>
+          <p className="text-sm text-zinc-500 leading-relaxed max-w-md">
+            Register as a freelancer to get discovered by clients and receive payments directly to your wallet.
+          </p>
         </div>
 
-        {/* Skills */}
-        <div>
-          <label className="block text-xs font-medium text-zinc-400 mb-1.5">Top Skills / Profession</label>
-          <input type="text" required placeholder="e.g. Solidity, React, Smart Contract Auditing" value={form.skills} onChange={f('skills')} className={inputCls} />
-        </div>
-
-        {/* Bio */}
-        <div>
-          <label className="block text-xs font-medium text-zinc-400 mb-1.5">Short Bio</label>
-          <textarea
-            rows={2}
-            placeholder="Tell clients a bit about yourself and what you build best..."
-            value={form.bio}
-            onChange={f('bio')}
-            className={`${inputCls} resize-none`}
-          />
-        </div>
-
-        {/* Portfolio + hourly rate */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Portfolio / Website</label>
-            <input type="url" placeholder="https://github.com/..." value={form.portfolio} onChange={f('portfolio')} className={inputCls} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Hourly Rate (USD)</label>
-            <div className="relative">
-              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-sm pointer-events-none">$</span>
-              <input type="number" min="1" step="1" placeholder="75" value={form.hourlyRate} onChange={f('hourlyRate')}
-                className="w-full rounded-xl border border-white/10 bg-white/5 pl-7 pr-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-all focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30" />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Name + Email */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Full Name</label>
+              <input type="text" required placeholder="Satoshi Nakamoto" value={form.fullName} onChange={f('fullName')} className={inputCls} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Email Address</label>
+              <input type="email" required placeholder="satoshi@bitcoin.org" value={form.email} onChange={f('email')} className={inputCls} />
             </div>
           </div>
-        </div>
 
-        {/* Social links */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">GitHub URL</label>
-            <input type="url" placeholder="https://github.com/yourname" value={form.githubUrl} onChange={f('githubUrl')} className={inputCls} />
+          {/* Skills */}
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Top Skills & Expertise</label>
+            <input type="text" required placeholder="e.g. Solidity, UI Design, Rust Development" value={form.skills} onChange={f('skills')} className={inputCls} />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1.5">Twitter / X URL</label>
-            <input type="url" placeholder="https://x.com/yourhandle" value={form.twitterUrl} onChange={f('twitterUrl')} className={inputCls} />
+
+          {/* Bio */}
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Professional Bio</label>
+            <textarea
+              rows={3}
+              placeholder="Tell clients about your background and what you build best..."
+              value={form.bio}
+              onChange={f('bio')}
+              className={`${inputCls} resize-none`}
+            />
           </div>
-        </div>
 
-        {/* Wallet */}
-        <div>
-          <label className="block text-xs font-medium text-zinc-400 mb-1.5">Ethereum Payment Address</label>
-          {!account ? (
-            <button type="button" onClick={connectWallet}
-              className="w-full rounded-xl border border-dashed border-violet-500/30 bg-violet-500/5 py-3 text-sm font-medium text-violet-400 hover:bg-violet-500/10 transition-colors">
-              Connect Wallet to Auto-fill Address
-            </button>
-          ) : (
-            <input type="text" readOnly value={form.ethAddress}
-              className="w-full rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-400 outline-none cursor-not-allowed font-mono" />
-          )}
-        </div>
-
-        <button type="submit" disabled={isSubmitting || !form.ethAddress}
-          className="w-full rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-3 text-sm font-semibold text-white transition-all duration-200 shadow-lg shadow-violet-500/20 mt-4 flex justify-center items-center gap-2">
-          {isSubmitting ? (
-            <>
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-              Saving Profile...
-            </>
-          ) : 'Complete Registration →'}
-        </button>
-      </form>
-
-      {errorMsg && (
-        <div className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-          {errorMsg}
-        </div>
-      )}
-
-      {success && (
-        <div className="mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 animate-in fade-in zoom-in duration-300">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">✓</div>
-            <div>
-              <p className="text-sm font-medium text-emerald-400">Profile Created Successfully!</p>
-              <p className="text-xs text-emerald-400/70 mt-0.5">Clients can now discover and hire you on-chain.</p>
+          {/* Portfolio + hourly rate */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Portfolio / Website</label>
+              <input type="url" placeholder="https://yourwork.com" value={form.portfolio} onChange={f('portfolio')} className={inputCls} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Hourly Rate (USD)</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
+                <input type="number" min="1" step="1" placeholder="75" value={form.hourlyRate} onChange={f('hourlyRate')}
+                  className="w-full rounded-2xl border border-white/5 bg-black/20 pl-8 pr-4 py-3.5 text-sm text-white focus:border-violet-500/50 transition-all font-bold" />
+              </div>
             </div>
           </div>
-          {form.ethAddress && (
-            <Link
-              href={`/freelancers/${form.ethAddress}`}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-4 py-2 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/25 transition-colors"
-            >
-              View your public profile →
-            </Link>
-          )}
-        </div>
-      )}
+
+          {/* Social links */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 text-zinc-500/80">GitHub Profile</label>
+              <input type="url" placeholder="https://github.com/..." value={form.githubUrl} onChange={f('githubUrl')} className={inputCls} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1 text-zinc-500/80">Twitter / X</label>
+              <input type="url" placeholder="https://x.com/..." value={form.twitterUrl} onChange={f('twitterUrl')} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Wallet Address */}
+          <div className="space-y-1.5">
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">On-Chain Payment Address</label>
+            {!account ? (
+              <button type="button" onClick={connectWallet}
+                className="w-full rounded-2xl border-2 border-dashed border-violet-500/20 bg-violet-600/5 py-4 text-sm font-bold text-violet-400 hover:bg-violet-600/10 transition-all">
+                Connect Wallet to Verify
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3.5">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                <code className="text-xs font-mono text-emerald-400 flex-grow">{account}</code>
+                <span className="text-[10px] font-bold text-emerald-500/50 uppercase tracking-widest">Verified</span>
+              </div>
+            )}
+          </div>
+
+          <button type="submit" disabled={isSubmitting || !form.ethAddress}
+            className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-violet-500/20 hover:shadow-violet-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+          >
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Securing Profile...
+              </span>
+            ) : 'Create My Freelancer ID →'}
+          </button>
+        </form>
+
+        {errorMsg && (
+          <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs font-medium text-red-400">
+            Error: {errorMsg}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

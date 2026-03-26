@@ -33,8 +33,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { chainJobId, senderAddress, content } = body;
 
-    if (!chainJobId || !senderAddress || !content) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (chainJobId === undefined || chainJobId === null || !senderAddress || !content) {
+      const missing = [];
+      if (chainJobId === undefined || chainJobId === null) missing.push("chainJobId");
+      if (!senderAddress) missing.push("senderAddress");
+      if (!content) missing.push("content");
+      return NextResponse.json({ error: `Missing required fields: ${missing.join(", ")}` }, { status: 400 });
     }
 
     const { data, error } = await supabase
@@ -47,11 +51,14 @@ export async function POST(req: NextRequest) {
       .select()
       .maybeSingle();
 
-    if (error) throw error;
-
+    if (error) {
+      console.error("[messages-api] Supabase error:", error);
+      return NextResponse.json({ error: error.message, details: error.details, code: error.code }, { status: 500 });
+    }
     return NextResponse.json(data);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";
+    console.error("[messages-api] Caught error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

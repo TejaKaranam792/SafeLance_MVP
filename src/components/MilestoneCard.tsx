@@ -4,11 +4,12 @@ import { useState } from "react";
 import { ethers } from "ethers";
 import {
   CheckCircle, Clock, AlertTriangle, XCircle, DollarSign,
-  ChevronDown, ChevronUp, ExternalLink, Loader2, ArrowRight
+  ChevronDown, ChevronUp, ExternalLink, Loader2, ArrowRight, Copy, Check
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { MILESTONE_ABI, MILESTONE_CONTRACT_ADDRESS, MILESTONE_STATUS, type MilestoneStatusKey } from "@/lib/contract";
 import { useWallet } from "@/components/WalletContext";
+import { useToast } from "@/components/Toast";
 
 export interface MilestoneData {
   index: number;
@@ -60,18 +61,20 @@ function RatingModal({ milestoneTitle, onConfirm, onCancel }: RatingModalProps) 
       background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
       padding: 24,
     }}>
-      <div style={{
-        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 24, padding: '32px 36px',
-        maxWidth: 440, width: '100%',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
-        fontFamily: "'Inter', sans-serif",
-      }}>
-        <div style={{ fontSize: 32, textAlign: 'center', marginBottom: 8 }}>⭐</div>
-        <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 800, textAlign: 'center', margin: '0 0 6px' }}>
-          Rate the Work
-        </h2>
+      <div className="relative w-full max-w-md overflow-hidden rounded-[32px] border border-white/10 bg-[#0a0a16]/80 p-8 shadow-2xl backdrop-blur-2xl animate-in zoom-in-95 duration-300">
+        {/* Ambient glow */}
+        <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-violet-600/20 blur-[60px]" />
+        <div className="absolute -bottom-24 -left-24 h-48 w-48 rounded-full bg-blue-600/10 blur-[60px]" />
+        
+        <div className="relative z-10">
+          <div className="mb-6 flex justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/5 border border-white/10 shadow-inner">
+              <span className="text-3xl">⭐</span>
+            </div>
+          </div>
+          <h2 className="text-center text-2xl font-black text-white mb-2 tracking-tight">
+            Rate the Work
+          </h2>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textAlign: 'center', marginBottom: 24 }}>
           How was <strong style={{ color: 'rgba(255,255,255,0.75)' }}>{milestoneTitle}</strong>?
         </p>
@@ -117,28 +120,21 @@ function RatingModal({ milestoneTitle, onConfirm, onCancel }: RatingModalProps) 
         />
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onCancel} style={{
-            flex: 1, padding: '12px 0',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 12, color: 'rgba(255,255,255,0.6)',
-            fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}>
+        <div className="flex gap-3 mt-8">
+          <button 
+            onClick={onCancel} 
+            className="flex-1 rounded-2xl border border-white/10 bg-white/5 py-3.5 text-sm font-bold text-zinc-400 hover:bg-white/10 hover:text-white transition-all"
+          >
             Cancel
           </button>
-          <button onClick={() => onConfirm(stars, comment)} style={{
-            flex: 2, padding: '12px 0',
-            background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-            border: 'none', borderRadius: 12, color: '#fff',
-            fontSize: 14, fontWeight: 700, cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(34,197,94,0.3)',
-            fontFamily: 'inherit',
-          }}>
+          <button 
+            onClick={() => onConfirm(stars, comment)} 
+            className="flex-[2] rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 py-3.5 text-sm font-black text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all border border-emerald-400/20"
+          >
             Approve & Release ⟠
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -147,13 +143,15 @@ function RatingModal({ milestoneTitle, onConfirm, onCancel }: RatingModalProps) 
 export default function MilestoneCard({ jobId, milestone, isClient, clientAddress, freelancerStatus, onRefresh }: MilestoneCardProps) {
   const router = useRouter();
   const { provider, account } = useWallet();
+  const { toast } = useToast();
   const isFreelancer = account?.toLowerCase() === milestone.freelancer.toLowerCase();
   const [expanded, setExpanded]       = useState(false);
   const [loading, setLoading]         = useState<string | null>(null);
   const [deliverableInput, setDeliverableInput] = useState(milestone.deliverableUrl ?? "");
   const [error, setError]             = useState<string | null>(null);
   const [txHash, setTxHash]           = useState<string | null>(null);
-  const [showRating, setShowRating]   = useState(false);  // ← NEW
+  const [showRating, setShowRating]   = useState(false);
+  const [copied, setCopied]             = useState(false);
 
   const statusLabel = MILESTONE_STATUS[milestone.status] as string;
   const config = STATUS_CONFIG[statusLabel] ?? STATUS_CONFIG["Pending"];
@@ -183,13 +181,18 @@ export default function MilestoneCard({ jobId, milestone, isClient, clientAddres
     setLoading(actionName);
     setError(null);
     setTxHash(null);
+    const toastId = toast(`Preparing ${actionName}...`, "loading");
     try {
       const tx = await action();
+      toast("Transaction submitted! Waiting for confirmation...", "loading");
       await tx.wait();
       setTxHash(tx.hash);
+      toast(`${actionName.charAt(0).toUpperCase() + actionName.slice(1)} successful!`, "success");
       onRefresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Transaction failed");
+      const msg = err instanceof Error ? err.message : "Transaction failed";
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setLoading(null);
     }
@@ -357,15 +360,31 @@ export default function MilestoneCard({ jobId, milestone, isClient, clientAddres
         <div className="px-5 pb-5 border-t border-white/5 pt-5 space-y-6 relative z-10">
           {/* Deliverable link (shown if submitted) */}
           {milestone.deliverableUrl && (
-            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4">
-              <span className="block text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">Freelancer Deliverable</span>
+            <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 group/deliv transition-all hover:bg-white/[0.04]">
+              <div className="flex items-center justify-between mb-3">
+                <span className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Freelancer Deliverable</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(milestone.deliverableUrl || "");
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                    toast("URL copied to clipboard", "success");
+                  }}
+                  className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 hover:text-white transition-colors"
+                >
+                  {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+                  {copied ? "Copied" : "Copy Link"}
+                </button>
+              </div>
               <a
                 href={milestone.deliverableUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors"
+                className="inline-flex items-center gap-2.5 text-sm font-bold text-violet-400 hover:text-violet-300 transition-colors break-all"
               >
-                <ExternalLink className="h-4 w-4" />
+                <div className="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center flex-shrink-0 group-hover/deliv:scale-110 transition-transform">
+                  <ExternalLink className="h-4 w-4" />
+                </div>
                 {milestone.deliverableUrl}
               </a>
             </div>

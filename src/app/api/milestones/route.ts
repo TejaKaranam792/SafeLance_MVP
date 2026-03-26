@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { chainJobId, milestones, clientAddress, freelancerAddress, jobTitle, jobDescription } = body;
 
-    if (!chainJobId || !milestones || !Array.isArray(milestones)) {
+    if (chainJobId === undefined || chainJobId === null || !milestones || !Array.isArray(milestones)) {
       return NextResponse.json({ error: "chainJobId and milestones array are required" }, { status: 400 });
     }
 

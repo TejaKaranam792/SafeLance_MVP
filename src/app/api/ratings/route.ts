@@ -31,8 +31,13 @@ export async function POST(req: NextRequest) {
   const { freelancer_address, client_address, chain_job_id, milestone_index, stars, comment, eth_amount } = body;
 
   // Basic validation
-  if (!freelancer_address || !client_address || !chain_job_id || milestone_index === undefined) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  if (!freelancer_address || !client_address || (chain_job_id === undefined || chain_job_id === null) || milestone_index === undefined) {
+    const missing = [];
+    if (!freelancer_address) missing.push("freelancer_address");
+    if (!client_address) missing.push("client_address");
+    if (chain_job_id === undefined || chain_job_id === null) missing.push("chain_job_id");
+    if (milestone_index === undefined) missing.push("milestone_index");
+    return NextResponse.json({ error: `Missing required fields: ${missing.join(", ")}` }, { status: 400 });
   }
   if (stars < 1 || stars > 5) {
     return NextResponse.json({ error: 'stars must be 1–5' }, { status: 400 });

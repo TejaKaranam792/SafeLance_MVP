@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS jobs_meta (
     freelancer_address TEXT NOT NULL,       -- freelancer wallet address
     title         TEXT NOT NULL,
     description   TEXT,
-    created_at    TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+    freelancer_status TEXT,                 -- JSON string: { freelancer_address: 'accepted'|'rejected'|'pending' }
+    created_at    TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+    updated_at    TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
 );
 
 -- ─── Milestones Metadata ──────────────────────────────────────────────────────
@@ -110,6 +112,18 @@ CREATE TABLE IF NOT EXISTS disputes (
 
     UNIQUE(chain_job_id, milestone_index)
 );
+
+-- ─── Workspace Messages ────────────────────────────────────────────────────────
+-- Real-time chat messages between client and assigned freelancers.
+CREATE TABLE IF NOT EXISTS messages (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    chain_job_id TEXT NOT NULL,
+    sender_address TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_job ON messages(chain_job_id);
 
 CREATE INDEX IF NOT EXISTS idx_disputes_status      ON disputes(status);
 CREATE INDEX IF NOT EXISTS idx_disputes_client      ON disputes(client_address);

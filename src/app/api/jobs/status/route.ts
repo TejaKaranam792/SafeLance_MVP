@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { fetchJobById, subgraphJobToMeta } from "@/lib/subgraph";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,8 +14,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { chainJobId, status, freelancerAddress } = body;
 
-    if (!chainJobId || !status || !freelancerAddress) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (chainJobId === undefined || chainJobId === null || !status || !freelancerAddress) {
+      const missing = [];
+      if (chainJobId === undefined || chainJobId === null) missing.push("chainJobId");
+      if (!status) missing.push("status");
+      if (!freelancerAddress) missing.push("freelancerAddress");
+      return NextResponse.json({ error: `Missing required fields: ${missing.join(", ")}` }, { status: 400 });
     }
 
     if (!["pending", "accepted", "rejected"].includes(status)) {
@@ -22,18 +27,51 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch current status
-    const { data: currentJob } = await supabase
+    // Fetch current statuses
+    const { data: currentJob, error: fetchError } = await supabase
       .from("jobs_meta")
       .select("freelancer_status")
       .eq("chain_job_id", String(chainJobId))
-      .single();
+      .maybeSingle();
+
+    if (fetchError) {
+       console.error("Supabase fetch error:", fetchError);
+       return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    }
 
     let statuses: Record<string, string> = {};
-    if (currentJob?.freelancer_status) {
-      if (currentJob.freelancer_status.startsWith("{")) {
-        try { statuses = JSON.parse(currentJob.freelancer_status); } catch (e) {}
+    
+    // Self-heal: If missing from Supabase but exists on-chain, create it
+    if (!currentJob) {
+      console.log(`[status-api] Job ${chainJobId} missing from Supabase, attempting self-heal from subgraph...`);
+      const subgraphJob = await fetchJobById(String(chainJobId));
+      if (subgraphJob) {
+        const meta = subgraphJobToMeta(subgraphJob);
+        const { error: insertError } = await supabase.from("jobs_meta").insert({
+          chain_job_id: String(chainJobId),
+          client_address: meta.client_address,
+          freelancer_address: meta.freelancer_address,
+          title: meta.title,
+          description: meta.description,
+          freelancer_status: JSON.stringify({ [freelancerAddress.toLowerCase()]: status })
+        });
+        if (insertError) {
+          console.error("[status-api] Self-heal insert failed:", insertError);
+          return NextResponse.json({ error: insertError.message }, { status: 500 });
+        }
+        return NextResponse.json({ success: true, status, healed: true });
       } else {
-        // Legacy single string, wipe it or migrate it
+        return NextResponse.json({ error: "Job not found on-chain or in database" }, { status: 404 });
+      }
+    }
+
+    if (currentJob?.freelancer_status) {
+      try {
+        statuses = JSON.parse(currentJob.freelancer_status);
+        if (typeof statuses !== "object" || statuses === null) statuses = {};
+      } catch (e) {
+        console.error("Failed to parse freelancer_status:", e);
+        statuses = {};
       }
     }
 

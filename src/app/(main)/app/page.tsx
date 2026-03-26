@@ -12,6 +12,9 @@ import {
   Briefcase, UserCircle, LayoutDashboard, ArrowRight,
   Plus, Trash2, Loader2, CheckCircle,
 } from "lucide-react";
+import { useToast } from "@/components/Toast";
+import { encodeAndRelay } from "@/lib/relay";
+import { CHAIN_ID } from "@/lib/contract";
 
 interface MilestoneRow {
   freelancerAddress: string;
@@ -21,7 +24,8 @@ interface MilestoneRow {
 }
 
 function AppPageContent() {
-  const { account, provider, getNonce, connectWallet } = useWallet();
+  const { account, provider, connectWallet } = useWallet();
+  const { toast } = useToast();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -113,6 +117,7 @@ function AppPageContent() {
     setIsSubmitting(true);
     setError(null);
     setCreatedJobId(null);
+    const toastId = toast("Connecting to chain...", "loading");
 
     try {
       const milestoneTitles = milestones.map((m) => m.title.trim());
@@ -129,22 +134,37 @@ function AppPageContent() {
       });
       const valData = await valRes.json();
       if (!valData.valid) {
-        throw new Error(`The following addresses are NOT registered freelancers on SafeLance: ${valData.unregistered.join(", ")}. Please ask them to create a profile first before you can hire them.`);
+        throw new Error(`Unregistered freelancers: ${valData.unregistered.join(", ")}`);
       }
 
-      // Use direct contract call (user signs directly — meta-tx for arrays needs custom encoding)
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(MILESTONE_CONTRACT_ADDRESS, MILESTONE_ABI, signer);
+      // ── GASLESS RELAY ──────────────────────────────────────────────────────
+      const contract = new ethers.Contract(MILESTONE_CONTRACT_ADDRESS, MILESTONE_ABI, provider);
+      const nonce = await contract.getNonce(account);
 
-      const tx = await contract.createJobWithMilestones(
-        jobTitle.trim(),
-        jobDescription.trim(),
-        milestoneTitles,
-        milestoneAmounts,
-        freelancerAddresses
-      );
-      const receipt = await tx.wait();
+      toast("Please sign the message in your wallet...", "loading");
 
+      const { txHash } = await encodeAndRelay({
+        contractAddress: MILESTONE_CONTRACT_ADDRESS,
+        abi: MILESTONE_ABI,
+        functionName: "createJobWithMilestones",
+        args: [
+          jobTitle.trim(),
+          jobDescription.trim(),
+          milestoneTitles,
+          milestoneAmounts,
+          freelancerAddresses
+        ],
+        userAddress: account,
+        nonce,
+        chainId: CHAIN_ID,
+        provider
+      });
+
+      toast("Transaction submitted! Waiting for confirmation...", "loading");
+
+      // Wait for tx on-chain (using provider)
+      const receipt = await provider.waitForTransaction(txHash);
+      
       // Extract jobId from event logs
       const iface = new ethers.Interface(MILESTONE_ABI);
       let jobId: number | null = null;
@@ -160,9 +180,7 @@ function AppPageContent() {
 
       if (jobId !== null) {
         setCreatedJobId(jobId);
-
         const uniqueFreelancers = Array.from(new Set(freelancerAddresses)).join(",");
-        // Save metadata to Supabase
         await fetch("/api/milestones", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -179,6 +197,7 @@ function AppPageContent() {
             })),
           }),
         });
+        toast("Job created successfully!", "success");
       }
 
       // Reset form
@@ -186,7 +205,9 @@ function AppPageContent() {
       setJobDescription("");
       setMilestones([{ freelancerAddress: initialFreelancer, title: "", description: "", amountEth: "0.01" }]);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Transaction failed");
+      const msg = err instanceof Error ? err.message : "Transaction failed";
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -358,25 +379,25 @@ function AppPageContent() {
                       {milestones.map((ms, idx) => (
                         <div
                           key={idx}
-                          className="group relative rounded-2xl border border-white/5 bg-white/[0.015] p-5 backdrop-blur-sm transition-all duration-300 hover:bg-white/[0.03] hover:border-white/10 hover:shadow-[0_8px_30px_rgba(139,92,246,0.06)]"
+                          className="group relative rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md transition-all duration-300 hover:bg-white/10 hover:border-violet-500/30 hover:shadow-[0_20px_50px_rgba(139,92,246,0.1)]"
                         >
-                          {/* Deep glow accent */}
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-violet-500/60 to-indigo-500/10 rounded-l-2xl opacity-30 group-hover:opacity-100 transition-opacity" />
+                          {/* Accent border */}
+                          <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-violet-500/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                          <div className="flex items-center justify-between mb-5">
+                          <div className="flex items-center justify-between mb-6">
                             <span className="flex items-center gap-3">
-                              <span className="flex items-center justify-center h-6 w-6 rounded-full bg-violet-500/10 text-violet-400 text-xs font-black">
+                              <span className="flex items-center justify-center h-7 w-7 rounded-full bg-violet-600 text-white text-xs font-black shadow-lg shadow-violet-500/20">
                                 {idx + 1}
                               </span>
-                              <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">
-                                Deliverable Phase
+                              <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-widest">
+                                Milestone Phase
                               </span>
                             </span>
                             {milestones.length > 1 && (
                               <button
                                 type="button"
                                 onClick={() => removeMilestone(idx)}
-                                className="text-zinc-600 hover:text-red-400 hover:bg-red-400/10 p-1.5 rounded-lg transition-all"
+                                className="text-zinc-500 hover:text-red-400 hover:bg-red-400/10 p-2 rounded-xl transition-all"
                                 title="Remove Milestone"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -384,20 +405,20 @@ function AppPageContent() {
                             )}
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div>
-                              <label className="block text-[10px] font-semibold text-zinc-500 mb-1.5 uppercase tracking-widest">Milestone Title</label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+                            <div className="space-y-1.5">
+                              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Title</label>
                               <input
                                 type="text"
                                 value={ms.title}
                                 onChange={(e) => updateMilestone(idx, "title", e.target.value)}
                                 required
-                                placeholder="e.g. Wireframes & UI"
-                                className="w-full rounded-xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/20 transition-all hover:bg-white/10"
+                                placeholder="Milestone name..."
+                                className="w-full rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-black/40 transition-all"
                               />
                             </div>
-                            <div>
-                              <label className="block text-[10px] font-semibold text-zinc-500 mb-1.5 uppercase tracking-widest">Assigned Freelancer</label>
+                            <div className="space-y-1.5">
+                              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Freelancer Address</label>
                               <input
                                 type="text"
                                 value={ms.freelancerAddress}
@@ -405,24 +426,24 @@ function AppPageContent() {
                                 required
                                 pattern="^0x[a-fA-F0-9]{40}$"
                                 placeholder="0x..."
-                                className="w-full font-mono rounded-xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/20 transition-all hover:bg-white/10"
+                                className="w-full font-mono rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-black/40 transition-all"
                               />
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-2">
-                              <label className="block text-[10px] font-semibold text-zinc-500 mb-1.5 uppercase tracking-widest">Requirements</label>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <div className="md:col-span-2 space-y-1.5">
+                              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Description (Requirements)</label>
                               <input
                                 type="text"
                                 value={ms.description}
                                 onChange={(e) => updateMilestone(idx, "description", e.target.value)}
-                                placeholder="Optional specific requirements..."
-                                className="w-full rounded-xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/20 transition-all hover:bg-white/10"
+                                placeholder="What needs to be delivered?"
+                                className="w-full rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-sm text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-black/40 transition-all"
                               />
                             </div>
-                            <div>
-                              <label className="block text-[10px] font-semibold text-zinc-500 mb-1.5 uppercase tracking-widest">Payout</label>
+                            <div className="space-y-1.5">
+                              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Budget (ETH)</label>
                               <div className="relative">
                                 <input
                                   type="number"
@@ -431,12 +452,9 @@ function AppPageContent() {
                                   required
                                   min="0.0001"
                                   step="0.001"
-                                  placeholder="0.00"
-                                  className="w-full rounded-xl border border-white/5 bg-white/5 pl-4 pr-14 py-3 text-sm font-semibold text-white placeholder-zinc-700 outline-none focus:border-violet-500/50 focus:bg-white/10 focus:ring-2 focus:ring-violet-500/20 transition-all hover:bg-white/10"
+                                  className="w-full rounded-xl border border-white/5 bg-black/20 pl-4 pr-12 py-3 text-sm font-bold text-white outline-none focus:border-violet-500/50 focus:bg-black/40 transition-all"
                                 />
-                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-violet-400 pointer-events-none">
-                                  ETH
-                                </span>
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-violet-400">ETH</span>
                               </div>
                             </div>
                           </div>
@@ -494,33 +512,70 @@ function AppPageContent() {
           )}
         </div>
 
-        {/* ── Side panel ──────────────────────────────────────────────────── */}
-        <div className="md:col-span-2 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-4">
-            {role === "client" ? "How milestones work" : "Why join?"}
-          </p>
-          {(role === "client"
-            ? [
-                { step: "01", title: "Create with milestones", body: "Define the scope and ETH amount per milestone in one transaction." },
-                { step: "02", title: "Fund each milestone", body: "Client sends exact ETH per milestone — locked in escrow, not releasable by anyone else." },
-                { step: "03", title: "Freelancer submits", body: "Freelancer marks work done and shares a deliverable link." },
-                { step: "04", title: "Client approves", body: "One click releases that milestone's ETH directly to the freelancer." },
-                { step: "05", title: "Dispute & refund", body: "If work isn't right, dispute it. Refund reclaims ETH to the client." },
-              ]
-            : [
-                { step: "01", title: "Register your profile", body: "Add your skills, portfolio URL and wallet address." },
-                { step: "02", title: "Get discovered", body: "Clients browse the public directory and hire you directly." },
-                { step: "03", title: "Work & get paid", body: "Each milestone approved — ETH lands in your wallet immediately." },
-              ]
-          ).map(({ step, title, body }) => (
-            <div key={step} className="flex gap-3.5 rounded-xl border border-white/6 bg-white/2 p-4">
-              <span className="flex-shrink-0 text-xl font-black text-white/10 leading-none pt-0.5">{step}</span>
-              <div>
-                <p className="text-sm font-semibold text-white mb-0.5">{title}</p>
-                <p className="text-xs text-zinc-500 leading-relaxed">{body}</p>
+        {/* ── Side panel (Summary & Tips) ─────────────────────────────────── */}
+        <div className="md:col-span-2 space-y-6">
+          {/* Sticky Summary Card */}
+          {role === "client" && (
+            <div className="sticky top-24 rounded-2xl border border-violet-500/20 bg-violet-600/5 p-6 backdrop-blur-md">
+              <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-4">Job Summary</h3>
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Milestones</span>
+                  <span className="text-white font-medium">{milestones.length}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Gas Fees</span>
+                  <span className="text-emerald-400 font-bold">FREE (Gasless)</span>
+                </div>
+                <div className="pt-3 border-t border-white/5 flex justify-between items-end">
+                  <span className="text-xs font-bold text-zinc-300">Total Escrow</span>
+                  <span className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">
+                    {totalEth.toFixed(4)} <small className="text-[10px] uppercase align-middle ml-1">ETH</small>
+                  </span>
+                </div>
+              </div>
+
+              {/* Status checklist helper */}
+              <div className="space-y-2">
+                {milestones.map((m, i) => (
+                  <div key={i} className="flex items-center gap-2 text-[10px]">
+                    <div className={`h-1.5 w-1.5 rounded-full ${m.title ? 'bg-emerald-500' : 'bg-zinc-700'}`} />
+                    <span className={m.title ? 'text-zinc-300' : 'text-zinc-600 truncate'}>
+                      {m.title || `Phase ${i+1} title missing`}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
+          )}
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-4">
+              {role === "client" ? "How milestones work" : "Why join?"}
+            </p>
+            {(role === "client"
+              ? [
+                  { step: "01", title: "Create with milestones", body: "Define the scope and ETH amount per milestone in one transaction." },
+                  { step: "02", title: "Fund each milestone", body: "Client sends exact ETH per milestone — locked in escrow, not releasable by anyone else." },
+                  { step: "03", title: "Freelancer submits", body: "Freelancer marks work done and shares a deliverable link." },
+                  { step: "04", title: "Client approves", body: "One click releases that milestone's ETH directly to the freelancer." },
+                  { step: "05", title: "Dispute & refund", body: "If work isn't right, dispute it. Refund reclaims ETH to the client." },
+                ]
+              : [
+                  { step: "01", title: "Register your profile", body: "Add your skills, portfolio URL and wallet address." },
+                  { step: "02", title: "Get discovered", body: "Clients browse the public directory and hire you directly." },
+                  { step: "03", title: "Work & get paid", body: "Each milestone approved — ETH lands in your wallet immediately." },
+                ]
+            ).map(({ step, title, body }) => (
+              <div key={step} className="flex gap-3.5 rounded-xl border border-white/6 bg-white/2 p-4">
+                <span className="flex-shrink-0 text-xl font-black text-white/10 leading-none pt-0.5">{step}</span>
+                <div>
+                  <p className="text-sm font-semibold text-white mb-0.5">{title}</p>
+                  <p className="text-xs text-zinc-500 leading-relaxed">{body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

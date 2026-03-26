@@ -1,0 +1,291 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0x8F6A0385A93B89539FF63956B0637FcCBb7d9753",
+      "txHash": "0x445cbfaedd24e291fb7bdc2bab2a1ae6350b05d53a03accdcf456ec6b74d1304",
+      "kind": "uups"
+    }
+  ],
+  "impls": {
+    "9e7832928674aec2e9410389d02f4543f5acd1d3563784be48be54606b8d86f8": {
+      "address": "0xcd8D873A964C633B5DE6b839Ad93a8ADb7df469A",
+      "txHash": "0xc2468a2e5bbd8d0ab54eac1dc706afa68474dbfe1f6ef27aa62cf8e3edfa1ebf",
+      "layout": {
+        "solcVersion": "0.8.24",
+        "storage": [
+          {
+            "label": "jobCount",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint256",
+            "contract": "MilestoneEscrow",
+            "src": "src\\MilestoneEscrow.sol:83"
+          },
+          {
+            "label": "reputationRegistry",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_contract(IReputationRegistry)9018",
+            "contract": "MilestoneEscrow",
+            "src": "src\\MilestoneEscrow.sol:85"
+          },
+          {
+            "label": "admin",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_address",
+            "contract": "MilestoneEscrow",
+            "src": "src\\MilestoneEscrow.sol:90"
+          },
+          {
+            "label": "jobs",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_mapping(t_uint256,t_struct(Job)9064_storage)",
+            "contract": "MilestoneEscrow",
+            "src": "src\\MilestoneEscrow.sol:91"
+          },
+          {
+            "label": "milestones",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_mapping(t_uint256,t_mapping(t_uint8,t_struct(Milestone)9051_storage))",
+            "contract": "MilestoneEscrow",
+            "src": "src\\MilestoneEscrow.sol:91"
+          },
+          {
+            "label": "nonces",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MilestoneEscrow",
+            "src": "src\\MilestoneEscrow.sol:92"
+          },
+          {
+            "label": "_metaTxSender",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_address",
+            "contract": "MilestoneEscrow",
+            "src": "src\\MilestoneEscrow.sol:233"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "MilestoneEscrow",
+            "src": "src\\MilestoneEscrow.sol:525"
+          }
+        ],
+        "types": {
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)220_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(PausableStorage)49_storage": {
+            "label": "struct PausableUpgradeable.PausableStorage",
+            "members": [
+              {
+                "label": "_paused",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_contract(IReputationRegistry)9018": {
+            "label": "contract IReputationRegistry",
+            "numberOfBytes": "20"
+          },
+          "t_enum(MilestoneStatus)9037": {
+            "label": "enum MilestoneEscrow.MilestoneStatus",
+            "members": [
+              "Pending",
+              "Funded",
+              "Submitted",
+              "Approved",
+              "Disputed",
+              "Refunded"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_uint8,t_struct(Milestone)9051_storage))": {
+            "label": "mapping(uint256 => mapping(uint8 => struct MilestoneEscrow.Milestone))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Job)9064_storage)": {
+            "label": "mapping(uint256 => struct MilestoneEscrow.Job)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint8,t_struct(Milestone)9051_storage)": {
+            "label": "mapping(uint8 => struct MilestoneEscrow.Milestone)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Job)9064_storage": {
+            "label": "struct MilestoneEscrow.Job",
+            "members": [
+              {
+                "label": "client",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "title",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "description",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "totalFunded",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "createdAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "milestoneCount",
+                "type": "t_uint8",
+                "offset": 0,
+                "slot": "5"
+              }
+            ],
+            "numberOfBytes": "192"
+          },
+          "t_struct(Milestone)9051_storage": {
+            "label": "struct MilestoneEscrow.Milestone",
+            "members": [
+              {
+                "label": "freelancer",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "title",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "amount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(MilestoneStatus)9037",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "fundedAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "releasedAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              }
+            ],
+            "numberOfBytes": "192"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Pausable": [
+            {
+              "contract": "PausableUpgradeable",
+              "label": "_paused",
+              "type": "t_bool",
+              "src": "@openzeppelin\\contracts-upgradeable\\utils\\PausableUpgradeable.sol:21",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin\\contracts\\proxy\\utils\\Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin\\contracts\\proxy\\utils\\Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

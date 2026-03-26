@@ -1,0 +1,41 @@
+specVersion: 1.0.0
+indexerHints:
+  prune: auto
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: MilestoneEscrow
+    network: sepolia
+    source:
+      address: "0x8F6A0385A93B89539FF63956B0637FcCBb7d9753"
+      abi: MilestoneEscrow
+      startBlock: 7890000
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Job
+        - Milestone
+      abis:
+        - name: MilestoneEscrow
+          file: ./abis/MilestoneEscrow.json
+      eventHandlers:
+        - event: JobCreated(indexed uint256,indexed address,string,uint8)
+          handler: handleJobCreated
+        - event: MilestoneAdded(indexed uint256,indexed uint8,indexed address,string,uint256)
+          handler: handleMilestoneAdded
+        - event: MilestoneFunded(indexed uint256,indexed uint8,uint256)
+          handler: handleMilestoneFunded
+        - event: MilestoneSubmitted(indexed uint256,indexed uint8)
+          handler: handleMilestoneSubmitted
+        - event: MilestoneApproved(indexed uint256,indexed uint8,indexed address,uint256)
+          handler: handleMilestoneApproved
+        - event: MilestoneDisputed(indexed uint256,indexed uint8)
+          handler: handleMilestoneDisputed
+        - event: MilestoneRefunded(indexed uint256,indexed uint8,indexed address,uint256)
+          handler: handleMilestoneRefunded
+        - event: DisputeResolved(indexed uint256,indexed uint8,indexed address,uint256,bool)
+          handler: handleDisputeResolved
+      file: ./src/mapping.ts

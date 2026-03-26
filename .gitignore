@@ -3,6 +3,7 @@
 # ── Dependencies ──────────────────────────────────────────────────────────────
 /node_modules
 /contracts/node_modules
+/subgraph/node_modules
 /.pnp
 .pnp.js
 
@@ -37,11 +38,21 @@ cleanup.mjs
 next-env.d.ts
 
 # ── Hardhat / Smart Contracts ─────────────────────────────────────────────────
+/contracts/cache/
+/contracts/artifacts/
+/contracts/typechain-types/
+/contracts/ignition/deployments/
 cache/
 artifacts/
 typechain/
 typechain-types/
 ignition/deployments/
+
+# ── The Graph ─────────────────────────────────────────────────────────────────
+/subgraph/generated/
+/subgraph/build/
+subgraph/generated/
+subgraph/build/
 
 # ── Vercel ────────────────────────────────────────────────────────────────────
 .vercel

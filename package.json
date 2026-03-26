@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.3",
+    "@upstash/redis": "^1.37.0",
     "ethers": "^6.10.0",
     "lucide-react": "^0.300.0",
     "next": "14.2.0",
@@ -17,6 +18,7 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

@@ -19,8 +19,13 @@ export async function PATCH(req: NextRequest) {
     wallet_address,
   } = body;
 
-  if (!chain_job_id || milestone_index === undefined || !role || !wallet_address) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  if (chain_job_id === undefined || chain_job_id === null || milestone_index === undefined || !role || !wallet_address) {
+    const missing = [];
+    if (chain_job_id === undefined || chain_job_id === null) missing.push("chain_job_id");
+    if (milestone_index === undefined) missing.push("milestone_index");
+    if (!role) missing.push("role");
+    if (!wallet_address) missing.push("wallet_address");
+    return NextResponse.json({ error: `Missing required fields: ${missing.join(", ")}` }, { status: 400 });
   }
 
   if (role !== "client" && role !== "freelancer") {

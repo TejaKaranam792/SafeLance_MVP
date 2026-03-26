@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
-import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contract";
+import { CONTRACT_ABI, CONTRACT_ADDRESS, MILESTONE_ABI, MILESTONE_CONTRACT_ADDRESS } from "@/lib/contract";
+import { Redis } from "@upstash/redis";
 
-// Simple in-memory rate limiters (Memory resets on cold starts in serverless, but adds basic MVP friction)
-const walletTxCount = new Map<string, number>();
-const IP_RATE_LIMIT = new Map<string, { count: number; resetAt: number }>();
+// Simple in-memory fallback if Redis is not yet configured in .env.local
+const fallbackWalletTxCount = new Map<string, number>();
+const fallbackIpRateLimit = new Map<string, { count: number; resetAt: number }>();
+
 const MAX_FREE_TX = 5;
 const MAX_IP_TX_PER_HOUR = 20;
+
+// Initialize Redis client gracefully
+const redis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  ? Redis.fromEnv()
+  : null;
 
 /**
  * POST /api/relay
@@ -19,7 +26,8 @@ const MAX_IP_TX_PER_HOUR = 20;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { functionData, signature, userAddress, value } = body as {
+    const { contractAddress, functionData, signature, userAddress, value } = body as {
+      contractAddress?: string;
       functionData: string;
       signature: string;
       userAddress: string;
@@ -41,30 +49,44 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!CONTRACT_ADDRESS || !ethers.isAddress(CONTRACT_ADDRESS)) {
+    const targetAddress = contractAddress || CONTRACT_ADDRESS;
+    if (!targetAddress || !ethers.isAddress(targetAddress)) {
       return NextResponse.json(
-        { error: "Server misconfiguration: CONTRACT_ADDRESS not set" },
-        { status: 500 }
+        { error: "Invalid or missing contractAddress" },
+        { status: 400 }
       );
     }
 
+    // Select ABI based on target address
+    const abi = targetAddress.toLowerCase() === MILESTONE_CONTRACT_ADDRESS.toLowerCase()
+      ? MILESTONE_ABI
+      : CONTRACT_ABI;
+
     // ── Friction / Rate Limiting ──────────────────────────────────────────
     const ip = req.headers.get("x-forwarded-for") || "unknown_ip";
-    
-    // IP Block Check
-    const ipData = IP_RATE_LIMIT.get(ip) || { count: 0, resetAt: Date.now() + 3600 * 1000 };
-    if (Date.now() > ipData.resetAt) {
-      ipData.count = 0;
-      ipData.resetAt = Date.now() + 3600 * 1000;
+    const normalizedWallet = userAddress.toLowerCase();
+
+    let ipCount = 0;
+    let walletCount = 0;
+
+    if (redis) {
+      ipCount = (await redis.get<number>(`rate_limit:ip:${ip}`)) || 0;
+      walletCount = (await redis.get<number>(`quota:wallet:${normalizedWallet}`)) || 0;
+    } else {
+      const ipData = fallbackIpRateLimit.get(ip) || { count: 0, resetAt: Date.now() + 3600 * 1000 };
+      if (Date.now() > ipData.resetAt) {
+        ipData.count = 0;
+        ipData.resetAt = Date.now() + 3600 * 1000;
+      }
+      ipCount = ipData.count;
+      walletCount = fallbackWalletTxCount.get(normalizedWallet) || 0;
     }
-    if (ipData.count >= MAX_IP_TX_PER_HOUR) {
+
+    if (ipCount >= MAX_IP_TX_PER_HOUR) {
       return NextResponse.json({ error: "IP rate limit exceeded. Try again later." }, { status: 429 });
     }
 
-    // Wallet Quota Check
-    const normalizedWallet = userAddress.toLowerCase();
-    const currentTxCount = walletTxCount.get(normalizedWallet) || 0;
-    if (currentTxCount >= MAX_FREE_TX) {
+    if (walletCount >= MAX_FREE_TX) {
       return NextResponse.json(
         { error: "Free gasless transaction quota exceeded (max 5 per wallet). Please pay your own gas." }, 
         { status: 429 }
@@ -90,8 +112,8 @@ export async function POST(req: NextRequest) {
 
     // ── Send executeMetaTx transaction ────────────────────────────────────
     const contract = new ethers.Contract(
-      CONTRACT_ADDRESS,
-      CONTRACT_ABI,
+      targetAddress,
+      abi,
       relayerWallet
     );
 
@@ -107,9 +129,21 @@ export async function POST(req: NextRequest) {
     const receipt = await tx.wait();
 
     // ── Update Counters ───────────────────────────────────────────────────
-    ipData.count += 1;
-    IP_RATE_LIMIT.set(ip, ipData);
-    walletTxCount.set(normalizedWallet, currentTxCount + 1);
+    if (redis) {
+      const p = redis.pipeline();
+      if (ipCount === 0) {
+        p.set(`rate_limit:ip:${ip}`, 1, { ex: 3600 }); // Expire in 1 hour
+      } else {
+        p.incr(`rate_limit:ip:${ip}`);
+      }
+      p.incr(`quota:wallet:${normalizedWallet}`);
+      await p.exec();
+    } else {
+      const ipData = fallbackIpRateLimit.get(ip) || { count: 0, resetAt: Date.now() + 3600 * 1000 };
+      ipData.count += 1;
+      fallbackIpRateLimit.set(ip, ipData);
+      fallbackWalletTxCount.set(normalizedWallet, walletCount + 1);
+    }
 
     return NextResponse.json({
       txHash: receipt.hash,

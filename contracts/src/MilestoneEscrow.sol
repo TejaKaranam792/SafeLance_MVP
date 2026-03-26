@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
 
 // Minimal interface to avoid circular imports
 interface IReputationRegistry {
@@ -24,7 +26,7 @@ interface IReputationRegistry {
  *         All actions support meta-transactions so users never pay gas.
  *         Integrates with ReputationRegistry to record on-chain ratings.
  */
-contract MilestoneEscrow is ReentrancyGuard, Pausable {
+contract MilestoneEscrow is Initializable, UUPSUpgradeable, ReentrancyGuard, PausableUpgradeable {
     using ECDSA for bytes32;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -80,13 +82,22 @@ contract MilestoneEscrow is ReentrancyGuard, Pausable {
     // Constructor
     // ─────────────────────────────────────────────────────────────────────────
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @param _reputationRegistry Address of ReputationRegistry, or address(0) to skip.
     /// @param _admin              Admin wallet that can resolve disputed milestones.
-    constructor(address _reputationRegistry, address _admin) {
+    function initialize(address _reputationRegistry, address _admin) public initializer {
+        __Pausable_init_unchained();
+
         require(_admin != address(0), "ME: zero admin");
         reputationRegistry = IReputationRegistry(_reputationRegistry);
         admin = _admin;
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyAdmin {}
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "ME: not admin");
@@ -504,4 +515,10 @@ contract MilestoneEscrow is ReentrancyGuard, Pausable {
     receive() external payable {
         revert("ME: use fundMilestone");
     }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     */
+    uint256[50] private __gap;
 }

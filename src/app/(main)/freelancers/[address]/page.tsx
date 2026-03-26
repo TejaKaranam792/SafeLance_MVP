@@ -3,6 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import ReputationBadge from '@/components/ReputationBadge';
+import { 
+  Github, Twitter, Globe, Mail, 
+  MapPin, CheckCircle, Copy, Check,
+  ChevronLeft, Award, Zap, Star,
+  Briefcase, TrendingUp
+} from 'lucide-react';
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -53,11 +59,14 @@ function shortAddr(addr: string) {
 
 function StarRow({ stars }: { stars: number }) {
   return (
-    <span style={{ fontSize: 14, letterSpacing: 1 }}>
+    <div className="flex gap-0.5">
       {Array.from({ length: 5 }).map((_, i) => (
-        <span key={i} style={{ color: i < stars ? '#f59e0b' : 'rgba(255,255,255,0.15)' }}>★</span>
+        <Star 
+          key={i} 
+          className={`h-3 w-3 ${i < stars ? 'fill-amber-400 text-amber-400' : 'text-white/10'}`} 
+        />
       ))}
-    </span>
+    </div>
   );
 }
 
@@ -138,106 +147,78 @@ export default function FreelancerProfilePage({ params }: { params: { address: s
   const skills = profile.skills ? profile.skills.split(',').map(s => s.trim()).filter(Boolean) : [];
 
   return (
-    <div style={{
-      maxWidth: 780,
-      margin: '0 auto',
-      padding: '40px 24px 80px',
-      fontFamily: "'Inter', sans-serif",
-    }}>
+    <div className="max-w-4xl mx-auto px-6 py-12 pb-24">
       {/* Back */}
-      <Link href="/freelancers" style={{
-        color: 'rgba(255,255,255,0.4)', textDecoration: 'none',
-        fontSize: 14, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 6,
-        marginBottom: 32, transition: 'color 0.2s',
-      }}
-        onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
+      <Link 
+        href="/freelancers" 
+        className="group inline-flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-white transition-colors mb-10"
       >
-        ← Back to Directory
+        <ChevronLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+        Back to Directory
       </Link>
 
       {/* ── Hero card ── */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(99,102,241,0.05) 100%)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 28,
-        padding: '32px 32px 28px',
-        position: 'relative',
-        overflow: 'hidden',
-        marginBottom: 20,
-      }}>
+      <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-white/5 p-8 md:p-10 backdrop-blur-xl mb-6">
         {/* Glow blobs */}
-        <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, background: 'rgba(139,92,246,0.15)', borderRadius: '50%', filter: 'blur(60px)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -40, left: -40, width: 150, height: 150, background: 'rgba(99,102,241,0.1)', borderRadius: '50%', filter: 'blur(50px)', pointerEvents: 'none' }} />
+        <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-violet-600/20 blur-[80px] pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 h-48 w-48 rounded-full bg-indigo-600/10 blur-[60px] pointer-events-none" />
 
-        <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start', flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
+        <div className="relative z-10 flex flex-col md:flex-row gap-8 items-start">
           {/* Avatar */}
-          <div style={{
-            width: 96, height: 96, borderRadius: 24, flexShrink: 0,
-            background: profile.avatar_url
-              ? `url(${profile.avatar_url}) center/cover`
-              : 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 32, fontWeight: 800,
-            boxShadow: '0 8px 32px rgba(139,92,246,0.3)',
-          }}>
+          <div 
+            className={`w-24 h-24 md:w-32 md:h-32 rounded-3xl flex-shrink-0 flex items-center justify-center text-white text-3xl md:text-4xl font-black shadow-2xl ${
+              profile.avatar_url ? '' : 'bg-gradient-to-br from-violet-600 to-indigo-600 shadow-violet-500/20'
+            }`}
+            style={profile.avatar_url ? { backgroundImage: `url(${profile.avatar_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+          >
             {!profile.avatar_url && initials}
           </div>
 
           {/* Identity */}
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
-              <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>
+          <div className="flex-1 space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">
                 {profile.full_name}
               </h1>
               {onChain.verified && (
-                <span style={{
-                  background: 'rgba(99,102,241,0.15)',
-                  border: '1px solid rgba(99,102,241,0.5)',
-                  borderRadius: 20, padding: '3px 10px',
-                  fontSize: 12, color: '#a5b4fc', fontWeight: 700,
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                }}>
-                  ✓ Verified Freelancer
-                </span>
+                <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                  <CheckCircle className="h-3 w-3" />
+                  Verified on-chain
+                </div>
               )}
             </div>
 
-            {/* Wallet */}
-            <button onClick={copyAddr} title="Click to copy" style={{
-              background: 'rgba(0,0,0,0.25)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 10, padding: '5px 12px',
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              cursor: 'pointer', marginBottom: 14,
-            }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-              <code style={{ color: '#34d399', fontSize: 13, fontFamily: 'monospace' }}>{shortAddr(address)}</code>
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>{copied ? '✓ Copied' : '⎘ Copy'}</span>
-            </button>
+            {/* Wallet & Badge Row */}
+            <div className="flex flex-wrap items-center gap-4">
+              <button 
+                onClick={copyAddr}
+                className="group flex items-center gap-2.5 rounded-xl border border-white/5 bg-black/40 px-3.5 py-2 transition-all hover:bg-black/60 hover:border-white/10"
+              >
+                <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                <code className="text-sm font-mono text-emerald-400/90">{shortAddr(address)}</code>
+                {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3 text-zinc-600 group-hover:text-zinc-400" />}
+              </button>
+              
+              <div className="h-4 w-px bg-white/10 hidden md:block" />
+              
+              <div className="flex items-center gap-1.5 text-zinc-500 text-xs font-medium">
+                <MapPin className="h-3.5 w-3.5" />
+                <span>On-Chain Freelancer</span>
+              </div>
+            </div>
 
             {/* Tags */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div className="flex flex-wrap gap-2">
               {skills.map(skill => (
-                <span key={skill} style={{
-                  background: 'rgba(139,92,246,0.12)',
-                  border: '1px solid rgba(139,92,246,0.3)',
-                  borderRadius: 20, padding: '3px 10px',
-                  fontSize: 12, color: '#c4b5fd', fontWeight: 600,
-                }}>
+                <span key={skill} className="rounded-lg bg-violet-500/10 border border-violet-500/20 px-3 py-1 text-xs font-bold text-violet-400">
                   {skill}
                 </span>
               ))}
             </div>
           </div>
 
-          {/* Reputation badge */}
-          <div style={{
-            background: 'rgba(0,0,0,0.2)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 20, padding: '20px 24px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          {/* Reputation Summary Side */}
+          <div className="w-full md:w-auto bg-black/20 rounded-2xl border border-white/5 p-6 flex flex-col items-center justify-center">
             <ReputationBadge
               score={onChain.score}
               verified={onChain.verified}
@@ -250,133 +231,134 @@ export default function FreelancerProfilePage({ params }: { params: { address: s
         </div>
       </div>
 
-      {/* ── Stats bar ── */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: 12, marginBottom: 20,
-      }}>
+      {/* ── Stats grid ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Reputation Score', value: `${onChain.score}/100`, icon: '🏅' },
-          { label: 'Milestones Done', value: onChain.milestonesCompleted, icon: '✅' },
-          { label: 'ETH Earned', value: `${parseFloat(onChain.totalEthEarned).toFixed(3)} ETH`, icon: '⟠' },
-          { label: 'Avg Rating', value: onChain.ratingCount > 0 ? `${avgStars.toFixed(1)} ★` : 'No ratings', icon: '⭐' },
+          { label: 'Score', value: `${onChain.score}/100`, icon: Award, color: 'text-violet-400' },
+          { label: 'Completed', value: onChain.milestonesCompleted, icon: CheckCircle, color: 'text-emerald-400' },
+          { label: 'Total Earnings', value: `${parseFloat(onChain.totalEthEarned).toFixed(3)} ETH`, icon: Zap, color: 'text-amber-400' },
+          { label: 'Avg Rating', value: onChain.ratingCount > 0 ? `${avgStars.toFixed(1)}` : 'N/A', icon: Star, color: 'text-fuchsia-400' },
         ].map(stat => (
-          <div key={stat.label} style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 18, padding: '18px 20px',
-          }}>
-            <div style={{ fontSize: 22, marginBottom: 6 }}>{stat.icon}</div>
-            <div style={{ color: '#fff', fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px' }}>{stat.value}</div>
-            <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: 2 }}>{stat.label}</div>
+          <div key={stat.label} className="group relative rounded-2xl border border-white/5 bg-white/2 p-5 transition-all hover:bg-white/5">
+            <stat.icon className={`h-5 w-5 mb-3 ${stat.color} opacity-60 group-hover:opacity-100 transition-opacity`} />
+            <div className="text-xl font-black text-white mb-1 tracking-tight">{stat.value}</div>
+            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{stat.label}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Bio + Links ── */}
-      <div style={{
-        background: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: 20, padding: '24px 28px',
-        marginBottom: 20,
-      }}>
-        {profile.bio && (
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15, lineHeight: 1.7, marginBottom: 20, margin: 0 }}>
-            {profile.bio}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        {/* Bio + Links */}
+        <div className="md:col-span-2 space-y-6">
+          <div className="rounded-2xl border border-white/5 bg-white/2 p-8 h-full">
+            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">About Freelancer</h3>
+            <p className="text-zinc-400 text-sm leading-relaxed mb-8">
+              {profile.bio || "No biography provided."}
+            </p>
+            
+            <div className="flex flex-wrap gap-3">
+              {profile.email && (
+                <a href={`mailto:${profile.email}`} className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all">
+                  <Mail className="h-3.5 w-3.5" />
+                  {profile.email}
+                </a>
+              )}
+              {profile.portfolio && (
+                <a href={profile.portfolio} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all">
+                  <Globe className="h-3.5 w-3.5" />
+                  Portfolio
+                </a>
+              )}
+              {profile.github_url && (
+                <a href={profile.github_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all">
+                  <Github className="h-3.5 w-3.5" />
+                  GitHub
+                </a>
+              )}
+              {profile.twitter_url && (
+                <a href={profile.twitter_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/2 px-4 py-2.5 text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition-all">
+                  <Twitter className="h-3.5 w-3.5" />
+                  Twitter
+                </a>
+              )}
+              {profile.hourly_rate && (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 text-xs font-bold text-emerald-400">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  ${profile.hourly_rate}/hr
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* CTA Side */}
+        <div className="rounded-2xl border border-violet-500/20 bg-violet-600/5 p-8 flex flex-col items-center justify-center text-center">
+          <Briefcase className="h-10 w-10 text-violet-400 mb-4 opacity-50" />
+          <h3 className="text-lg font-black text-white mb-2">Hire Directly</h3>
+          <p className="text-xs text-zinc-500 mb-8 max-w-[180px]">
+            Start a new secure escrow contract with this freelancer.
           </p>
-        )}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: profile.bio ? 20 : 0   }}>
-          {profile.email && (
-            <a href={`mailto:${profile.email}`} style={linkStyle}>✉ {profile.email}</a>
-          )}
-          {profile.portfolio && (
-            <a href={profile.portfolio} target="_blank" rel="noreferrer" style={linkStyle}>🌐 Portfolio</a>
-          )}
-          {profile.github_url && (
-            <a href={profile.github_url} target="_blank" rel="noreferrer" style={linkStyle}>⬡ GitHub</a>
-          )}
-          {profile.twitter_url && (
-            <a href={profile.twitter_url} target="_blank" rel="noreferrer" style={linkStyle}>✦ Twitter</a>
-          )}
-          {profile.hourly_rate && (
-            <span style={{ ...linkStyle, cursor: 'default', background: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)', color: '#6ee7b7' }}>
-              ${profile.hourly_rate}/hr
-            </span>
-          )}
+          <Link 
+            href={`/app?hire=${address}`}
+            className="w-full rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-violet-500/20 hover:shadow-violet-500/40 hover:-translate-y-0.5 transition-all active:translate-y-0"
+          >
+            Create Job Offer →
+          </Link>
+          <p className="mt-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
+            On-chain & Gasless
+          </p>
         </div>
       </div>
 
       {/* ── Rating History ── */}
-      <div style={{
-        background: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: 20, padding: '24px 28px',
-        marginBottom: 24,
-      }}>
-        <h2 style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: '0 0 20px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          ⭐ Client Reviews
-          <span style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 10px', fontSize: 12, color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
-            {ratings.length}
-          </span>
-        </h2>
+      <div className="rounded-2xl border border-white/5 bg-white/2 p-8">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-xl font-black text-white flex items-center gap-3">
+            <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
+            Client Reviews
+            <span className="rounded-lg bg-white/5 border border-white/10 px-2 py-0.5 text-xs font-bold text-zinc-500">
+              {ratings.length}
+            </span>
+          </h2>
+        </div>
 
         {ratings.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: 'rgba(255,255,255,0.25)', fontSize: 14 }}>
-            No reviews yet — complete your first milestone to earn your first rating!
+          <div className="py-20 text-center">
+            <p className="text-sm text-zinc-600 font-medium italic">
+              "No reviews yet — complete your first milestone to earn your first rating!"
+            </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="grid grid-cols-1 gap-4">
             {ratings.map((r, i) => (
-              <div key={i} style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 14, padding: '16px 20px',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-                  <div>
+              <div key={i} className="group relative rounded-2xl border border-white/5 bg-black/20 p-6 transition-all hover:bg-black/40">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                  <div className="space-y-1">
                     <StarRow stars={r.stars} />
-                    <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 4 }}>
-                      from {shortAddr(r.client_address)} · Job #{r.chain_job_id} · Milestone {r.milestone_index + 1}
+                    <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pt-1">
+                      Job #{r.chain_job_id} · {shortAddr(r.client_address)}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ color: '#34d399', fontSize: 13, fontWeight: 700 }}>
-                      ⟠ {parseFloat(r.eth_amount).toFixed(4)} ETH
+                  <div className="sm:text-right">
+                    <div className="text-sm font-black text-emerald-400">
+                       {parseFloat(r.eth_amount).toFixed(4)} ETH
                     </div>
-                    <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, marginTop: 2 }}>
-                      {new Date(r.created_at).toLocaleDateString()}
+                    <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mt-1">
+                      {new Date(r.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </div>
                   </div>
                 </div>
                 {r.comment && (
-                  <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 1.6, margin: 0, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, marginTop: 2 }}>
-                    "{r.comment}"
-                  </p>
+                  <div className="relative pt-4 mt-2 border-t border-white/5">
+                    <p className="text-sm text-zinc-300 italic leading-relaxed">
+                      "{r.comment}"
+                    </p>
+                  </div>
                 )}
               </div>
             ))}
           </div>
         )}
-      </div>
-
-      {/* ── CTA ── */}
-      <div style={{ textAlign: 'center' }}>
-        <Link href={`/app?hire=${address}`} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          background: 'linear-gradient(135deg, #7c3aed, #4f46e5)',
-          color: '#fff', padding: '14px 36px', borderRadius: 16,
-          fontSize: 15, fontWeight: 700, textDecoration: 'none',
-          boxShadow: '0 8px 32px rgba(124,58,237,0.4)',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-        }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(124,58,237,0.55)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 8px 32px rgba(124,58,237,0.4)'; }}
-        >
-          Hire {profile.full_name.split(' ')[0]} → Escrow
-        </Link>
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 12, marginTop: 10 }}>
-          Secured by on-chain smart contract · Gasless transactions
-        </p>
       </div>
     </div>
   );

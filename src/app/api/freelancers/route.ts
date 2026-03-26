@@ -40,7 +40,12 @@ export async function POST(req: NextRequest) {
     const { ethAddress, fullName, email, skills, portfolio, hourlyRate, bio, githubUrl, twitterUrl } = body;
 
     if (!ethAddress || !fullName || !email || !skills) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      const missing = [];
+      if (!ethAddress) missing.push("ethAddress");
+      if (!fullName) missing.push("fullName");
+      if (!email) missing.push("email");
+      if (!skills) missing.push("skills");
+      return NextResponse.json({ error: `Missing required fields: ${missing.join(", ")}` }, { status: 400 });
     }
 
     const { data, error } = await supabase

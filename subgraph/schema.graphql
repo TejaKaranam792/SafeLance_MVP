@@ -1,0 +1,17 @@
+type Job @entity {
+  id: ID!
+  client: Bytes!
+  title: String!
+  milestoneCount: Int!
+  milestones: [Milestone!]! @derivedFrom(field: "job")
+}
+
+type Milestone @entity {
+  id: ID!
+  job: Job!
+  index: Int!
+  freelancer: Bytes!
+  title: String!
+  amount: BigInt!
+  status: Int!
+}
